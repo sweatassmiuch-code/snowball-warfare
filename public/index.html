@@ -20,6 +20,7 @@
     </div>
     <div class="chip"><span class="dot-live"></span><span id="onlineCount">1</span>&nbsp;SPIELER</div>
     <div class="chip" id="pingChip"><span id="pingVal">0</span>&nbsp;ms</div>
+    <div class="chip perf hidden" id="perfChip" title="FPS-Anzeige mit F umschalten"><span class="label">FPS</span><b id="fpsVal">–</b><span id="fpsScale" class="tiny">1.00×</span></div>
     <div class="grow"></div>
     <button class="chip action" id="muteBtn">TON&nbsp;AN</button>
     <button class="chip action" id="menuBtn">MENÜ</button>
@@ -40,7 +41,8 @@
   <div id="chargeLabel">SCHNEEBALL</div>
 
   <div id="bottomBar">
-    <div id="hint">WASD bewegen · SHIFT sprinten · LEERTASTE springen · MAUS zielen · LINKSKLICK halten &amp; loslassen zum Werfen</div>
+    <div id="hint">WASD bewegen · SHIFT sprinten (Ausdauer) · LEERTASTE springen · MAUS zielen · LINKSKLICK halten &amp; loslassen zum Werfen</div>
+    <div id="staminaWrap" aria-hidden="true"><i id="staminaFill"></i></div>
     <div id="stance">EIN TREFFER = AUSGESCHALTET</div>
   </div>
 
@@ -77,15 +79,17 @@
           <li><b>Treffer</b><span>Ein Körpertreffer schaltet aus</span></li>
           <li><b>Wurf</b><span>Linksklick halten = mehr Wucht</span></li>
           <li><b>Gelände</b><span>Hügel, Wald, Hütte &amp; Eissee</span></li>
+          <li><b>Wind</b><span>Seitenwind trägt deine Würfe</span></li>
         </ul>
         <div class="controls">
           <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Bewegen</span></div>
-          <div><kbd>SHIFT</kbd><span>Sprinten</span></div>
+          <div><kbd>SHIFT</kbd><span>Sprinten (Ausdauer)</span></div>
           <div><kbd>SPACE</kbd><span>Springen</span></div>
           <div><kbd>MAUS</kbd><span>Zielen</span></div>
           <div><kbd>LMB</kbd><span>Werfen (halten)</span></div>
           <div><kbd>TAB</kbd><span>Rangliste</span></div>
           <div><kbd>M</kbd><span>Ton aus/an</span></div>
+          <div><kbd>F</kbd><span>FPS-Anzeige</span></div>
           <div><kbd>ESC</kbd><span>Pause</span></div>
         </div>
         <p class="small-note">Bots kämpfen automatisch mit. Teile den Raumcode, um Freunde einzuladen.</p>

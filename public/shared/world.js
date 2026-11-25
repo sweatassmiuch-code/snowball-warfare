@@ -23,9 +23,14 @@ export const BALL = {
   radius: 0.105,
   minSpeed: 14,
   maxSpeed: 34,
-  gravity: 7.6,      // slightly reduced gravity for readable arcs
+  gravity: 9.2,
+  drag: 0.10,        // light air drag so long throws lose a little punch
   maxLife: 7
 };
+
+// Constant crosswind — both the host simulation and the client prediction use
+// the same values, so the ball flies where it looks like it flies.
+export const WIND = { x: 0.55, z: -0.34 };
 
 export const POND = { x: 8, z: -30, r: 20, level: -0.9 };
 
@@ -109,6 +114,12 @@ export function terrainHeight(x, z) {
     }
   }
   return h;
+}
+
+// 0 = flat, 1 = vertical wall. Used for slope sliding and foot placement.
+export function terrainSlope(x, z, eps = 0.7) {
+  const n = terrainNormal(x, z, eps);
+  return Math.min(1, Math.sqrt(n.x * n.x + n.z * n.z));
 }
 
 export function terrainNormal(x, z, eps = 0.6) {

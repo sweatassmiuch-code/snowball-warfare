@@ -1,7 +1,7 @@
 import * as THREE from '../vendor/three.module.js';
 import {
-  PLAYER, BALL, WORLD, RESPAWN_MS,
-  terrainHeight, resolvePlayerCollision, clampToWorld
+  PLAYER, BALL, WORLD, RESPAWN_MS, WIND,
+  terrainHeight, terrainNormal, terrainSlope, resolvePlayerCollision, clampToWorld
 } from '../shared/world.js';
 import { createWorld } from './scene.js';
 import { createEffects } from './fx.js';
@@ -28,13 +28,14 @@ const ui = {
   deathKiller: $('deathKiller'), respawnBar: $('respawnBar'), respawnText: $('respawnText'),
   matchBanner: $('matchBanner'), matchText: $('matchText'), matchSub: $('matchSub'),
   muteBtn: $('muteBtn'), menuBtn: $('menuBtn'), toast: $('toast'), copyCode: $('copyCode'),
-  roomChip: $('roomChip')
+  roomChip: $('roomChip'), staminaFill: $('staminaFill'), staminaWrap: $('staminaWrap'),
+  perfChip: $('perfChip'), fpsVal: $('fpsVal'), fpsScale: $('fpsScale')
 };
 
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
-const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3 };
+const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3, showFps: false };
 let settings = { ...defaults };
 try {
   settings = { ...defaults, ...JSON.parse(localStorage.getItem('sbw.settings') || '{}') };
@@ -49,6 +50,7 @@ ui.qualitySel.value = settings.quality;
 ui.botsSel.value = String(settings.bots);
 ui.sensVal.textContent = Number(settings.sens).toFixed(2);
 ui.volVal.textContent = Math.round(settings.vol * 100) + '%';
+ui.perfChip.classList.toggle('hidden', !settings.showFps);
 
 // ---------------------------------------------------------------------------
 // Renderer
@@ -117,7 +119,7 @@ const post = (() => {
         w[0] = 0.227027; w[1] = 0.1945946; w[2] = 0.1216216; w[3] = 0.054054; w[4] = 0.016216;
         vec3 sum = texture2D(tDiffuse, vUv).rgb * w[0];
         for (int i = 1; i < 5; i++) {
-          vec2 off = uDir * uTexel * float(i) * 1.6;
+          vec2 off = uDir * uTexel * float(i) * 1.05;
           sum += texture2D(tDiffuse, vUv + off).rgb * w[i];
           sum += texture2D(tDiffuse, vUv - off).rgb * w[i];
         }
@@ -128,13 +130,13 @@ const post = (() => {
   const composite = new THREE.ShaderMaterial({
     uniforms: {
       tScene: { value: null }, tBloom: { value: null },
-      uTime: { value: 0 }, uExposure: { value: 0.74 }, uBloom: { value: 0.30 },
-      uDesat: { value: 0 }, uFlash: { value: 0 }, uGrain: { value: 1 }
+      uTime: { value: 0 }, uExposure: { value: 0.78 }, uBloom: { value: 0.34 },
+      uDesat: { value: 0 }, uFlash: { value: 0 }, uGrain: { value: 1 }, uFrost: { value: 0.55 }
     },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
     fragmentShader: `
       uniform sampler2D tScene; uniform sampler2D tBloom;
-      uniform float uTime, uExposure, uBloom, uDesat, uFlash, uGrain;
+      uniform float uTime, uExposure, uBloom, uDesat, uFlash, uGrain, uFrost;
       varying vec2 vUv;
 
       vec3 aces(vec3 x) {
@@ -172,6 +174,12 @@ const post = (() => {
         float vig = smoothstep(1.0, 0.15, r2 * 1.85);
         col *= mix(0.42, 1.0, vig);
 
+        // faint breath of frost right at the corners of the lens
+        float fn2 = hash(floor(uv * vec2(70.0, 44.0)) + 11.0);
+        float frost = smoothstep(0.68, 0.98, fn2);
+        float edge = smoothstep(0.42, 0.68, r2);
+        col = mix(col, vec3(0.90, 0.96, 1.0), frost * edge * uFrost * 0.22);
+
         float g = hash(uv * vec2(1931.0, 1087.0) + vec2(uTime * 9.0, uTime * 5.0)) - 0.5;
         col += g * 0.028 * uGrain;
 
@@ -192,7 +200,7 @@ const post = (() => {
     W = Math.max(1, Math.floor(w * pixelRatio));
     H = Math.max(1, Math.floor(h * pixelRatio));
     rtScene.setSize(W, H);
-    const bw = Math.max(1, Math.floor(W / 4)), bh = Math.max(1, Math.floor(H / 4));
+    const bw = Math.max(1, Math.floor(W / 6)), bh = Math.max(1, Math.floor(H / 6));
     rtA.setSize(bw, bh);
     rtB.setSize(bw, bh);
     blur.uniforms.uTexel.value.set(1 / bw, 1 / bh);
@@ -255,15 +263,27 @@ const viewmodel = createViewModel();
 camera.add(viewmodel.group);
 viewmodel.setVisible(false);
 
+let baseDpr = 1;
+let renderScale = 1;
+
 function applyQuality(q) {
   const base = window.devicePixelRatio || 1;
-  dpr = q === 'low' ? 1 : q === 'mid' ? Math.min(base, 1.5) : Math.min(base, 2);
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  dpr = q === 'low' ? 1 : q === 'mid' ? Math.min(base, 1.35) : Math.min(base, 1.5);
+  baseDpr = dpr;
   post.setBloom(q !== 'low');
   post.composite.uniforms.uGrain.value = q === 'low' ? 0.6 : 1;
-  world.setSnowQuality(dpr);
-  onResize();
+  applyRenderScale(renderScale);
+}
+
+// Holds the frame budget by scaling render resolution only — simulation,
+// network rate and gameplay timing stay untouched.
+function applyRenderScale(s) {
+  renderScale = Math.max(0.6, Math.min(1, s));
+  const ratio = Math.max(0.55, baseDpr * renderScale);
+  renderer.setPixelRatio(ratio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  post.resize(window.innerWidth, window.innerHeight, ratio);
+  world.setSnowQuality(ratio);
 }
 applyQuality(settings.quality);
 
@@ -313,7 +333,15 @@ const G = {
   ping: 0,
   lastPingUpdate: 0,
   breathTimer: 2,
-  lastScoreRender: 0
+  lastScoreRender: 0,
+  stamina: 1,
+  staminaLock: 0,
+  coyote: 0,
+  jumpBuf: 0,
+  landDip: 0,
+  spread: 0,
+  lastNear: 0,
+  lowFx: false
 };
 
 const isPlaying = () => G.session && !G.dead && G.mode === 'playing';
@@ -633,6 +661,19 @@ function handleEvent(msg) {
     return;
   }
 
+  if (msg.t === 'near') {
+    // a ball whistled past: small flinch + whoosh
+    if (nowMs() - G.lastNear > 90) {
+      G.lastNear = nowMs();
+      const d = Math.hypot(msg.x - camera.position.x, msg.z - camera.position.z);
+      if (d < 14) {
+        G.shake = Math.max(G.shake, 0.05 * (1 - d / 14));
+        audio.throwWhoosh();
+      }
+    }
+    return;
+  }
+
   if (msg.t === 'kill') {
     pushFeedNames(msg.s, msg.v, msg.s === G.selfId || msg.v === G.selfId);
     if (msg.v === G.selfId) {
@@ -852,6 +893,14 @@ window.addEventListener('keydown', (e) => {
     ui.muteBtn.textContent = audio.isMuted() ? 'TON AUS' : 'TON AN';
     return;
   }
+  if (key === 'KeyF') {
+    settings.showFps = !settings.showFps;
+    saveSettings();
+    ui.perfChip.classList.toggle('hidden', !settings.showFps);
+    showToast(settings.showFps ? 'FPS-Anzeige an' : 'FPS-Anzeige aus');
+    return;
+  }
+  if (key === 'Space') G.jumpBuf = 0.16;
   G.keys.add(key);
 });
 
@@ -912,20 +961,27 @@ function throwSnowball() {
   ui.chargeWrap.classList.remove('full');
   if (!G.session || G.dead || G.mode !== 'playing') return;
 
-  const speed = 15.5 + power * 17;
+  // a rushed throw is weaker and less accurate than a full wind-up
+  const speed = 15 + power * 19;
+  const moveSpread = Math.min(1, Math.hypot(moveDir.x, moveDir.z) / PLAYER.sprint);
+  const spread = 0.004 + moveSpread * 0.017 + (1 - power) * 0.011 + (G.grounded ? 0 : 0.008);
+
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
-  dir.x += (Math.random() - 0.5) * 0.006;
-  dir.y += (Math.random() - 0.5) * 0.006;
+  dir.x += (Math.random() - 0.5) * spread;
+  dir.y += (Math.random() - 0.5) * spread * 0.7;
+  dir.z += (Math.random() - 0.5) * spread;
   dir.normalize();
 
   const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
   const origin = camera.position.clone()
-    .add(dir.clone().multiplyScalar(0.42))
-    .add(right.clone().multiplyScalar(0.13))
-    .add(new THREE.Vector3(0, -0.12, 0));
+    .add(dir.clone().multiplyScalar(0.46))
+    .add(right.clone().multiplyScalar(0.15))
+    .add(new THREE.Vector3(0, -0.10, 0));
 
   const vel = dir.clone().multiplyScalar(speed);
+  vel.x += WIND.x * 0.25;
+  vel.z += WIND.z * 0.25;
 
   G.throwSeq++;
   const id = `${G.selfId}:${G.throwSeq}`;
@@ -933,10 +989,10 @@ function throwSnowball() {
   G.session.throwBall(G.throwSeq, origin.toArray(), vel.toArray());
 
   viewmodel.throwBall();
-  G.cooldown = 0.34;
-  G.fovKick = 3.2;
-  G.recoil += 0.006 + power * 0.012;
-  G.shake = Math.max(G.shake, 0.035);
+  G.cooldown = 0.30 + (1 - power) * 0.14;
+  G.fovKick = 2.6 + power * 1.2;
+  G.recoil += 0.005 + power * 0.013;
+  G.shake = Math.max(G.shake, 0.028 + power * 0.012);
   audio.throwWhoosh();
 }
 
@@ -958,13 +1014,17 @@ function updateProjectiles(dt) {
   for (const [id, pr] of G.projectiles) {
     pr.life += dt;
     pr.v.y -= BALL.gravity * dt;
+    const dragF = Math.max(0, 1 - BALL.drag * dt);
+    pr.v.x *= dragF; pr.v.y *= dragF; pr.v.z *= dragF;
+    pr.v.x += WIND.x * dt;
+    pr.v.z += WIND.z * dt;
     pr.p.addScaledVector(pr.v, dt);
     pr.mesh.position.copy(pr.p);
     pr.mesh.rotation.x += pr.spin.x * dt;
     pr.mesh.rotation.y += pr.spin.y * dt;
 
     pr.trailT += dt;
-    if (pr.trailT > 0.022) {
+    if (pr.trailT > 0.016) {
       pr.trailT = 0;
       effects.trail(pr.p.x, pr.p.y, pr.p.z);
     }
@@ -1004,12 +1064,44 @@ function updateLocalPlayer(dt) {
     }
   }
 
-  const sprinting = G.keys.has('ShiftLeft') || G.keys.has('ShiftRight');
+  // --- sprint stamina -----------------------------------------------------
+  const wantSprint = (G.keys.has('ShiftLeft') || G.keys.has('ShiftRight')) && alive && G.mode === 'playing';
+  const wantsToMove = Math.hypot(wishX, wishZ) > 0.01;
+  const sprinting = wantSprint && wantsToMove && G.stamina > 0.02 && G.staminaLock <= 0;
+
+  if (sprinting) {
+    G.stamina = Math.max(0, G.stamina - dt * 0.29);
+    if (G.stamina <= 0) G.staminaLock = 1.1;
+  } else {
+    G.stamina = Math.min(1, G.stamina + dt * (wantsToMove ? 0.16 : 0.32));
+  }
+  G.staminaLock = Math.max(0, G.staminaLock - dt);
+
   const maxSpeed = sprinting ? PLAYER.sprint : PLAYER.walk;
-  const accel = G.grounded ? 16 : 4.5;
+  const accel = G.grounded ? 32 : 7.5;
+
+  // steep ground pulls you downhill instead of letting you stand on a wall
+  if (alive && G.grounded) {
+    const slope = terrainSlope(G.pos.x, G.pos.z);
+    if (slope > 0.26) {
+      const n = terrainNormal(G.pos.x, G.pos.z);
+      const pull = (slope - 0.26) * 26;
+      moveDir.x += n.x * pull * dt;
+      moveDir.z += n.z * pull * dt;
+    }
+  }
 
   moveDir.x += (wishX * maxSpeed - moveDir.x) * Math.min(1, accel * dt);
   moveDir.z += (wishZ * maxSpeed - moveDir.z) * Math.min(1, accel * dt);
+
+  if (G.grounded && !wantsToMove) {
+    const f = Math.max(0, 1 - dt * 9);
+    moveDir.x *= f;
+    moveDir.z *= f;
+  }
+
+  G.coyote = G.grounded ? 0.12 : Math.max(0, G.coyote - dt);
+  G.jumpBuf = Math.max(0, G.jumpBuf - dt);
 
   if (alive) {
     G.pos.x += moveDir.x * dt;
@@ -1017,18 +1109,25 @@ function updateLocalPlayer(dt) {
     resolvePlayerCollision(G.pos);
     clampToWorld(G.pos);
 
-    if (G.keys.has('Space') && G.grounded && G.mode === 'playing') {
-      G.vy = 5.2;
+    if (G.jumpBuf > 0 && G.coyote > 0 && G.mode === 'playing') {
+      G.vy = 6.1;
       G.grounded = false;
+      G.coyote = 0;
+      G.jumpBuf = 0;
+      effects.spray(G.pos.x, G.pos.z, moveDir.x, moveDir.z, 0.8);
     }
 
-    G.vy -= 22 * dt;
+    G.vy -= 24 * dt;
     G.pos.y += G.vy * dt;
     const ground = terrainHeight(G.pos.x, G.pos.z);
     if (G.pos.y <= ground) {
-      if (!G.grounded && G.vy < -3.5) {
-        G.shake = Math.max(G.shake, 0.06);
-        effects.burst(G.pos.x, ground + 0.05, G.pos.z, { count: 5, speed: 1.2, up: 0.9, size: 0.05, life: 0.6, gravity: 4 });
+      const impact = Math.max(0, -G.vy);
+      if (!G.grounded && impact > 1.5) {
+        const force = Math.min(1.7, impact / 9);
+        G.landDip = Math.min(0.17, 0.04 + force * 0.13);
+        G.shake = Math.max(G.shake, 0.015 + force * 0.07);
+        effects.landing(G.pos.x, ground, G.pos.z, force);
+        audio.footstep(force > 0.8);
       }
       G.pos.y = ground;
       G.vy = 0;
@@ -1051,7 +1150,8 @@ function updateLocalPlayer(dt) {
   G.recoil *= Math.max(0, 1 - dt * 9);
   G.shake *= Math.max(0, 1 - dt * 6);
 
-  let eye = PLAYER.eye;
+  G.landDip *= Math.max(0, 1 - dt * 7);
+  let eye = PLAYER.eye - G.landDip;
 
   if (G.dead) {
     G.deathT = Math.min(1, G.deathT + dt * 1.8);
@@ -1093,6 +1193,7 @@ function updateLocalPlayer(dt) {
       G.footAccum = 0;
       G.footSide *= -1;
       effects.footstep(G.pos.x, G.pos.z, G.yaw + Math.PI, G.footSide);
+      if (sprinting) effects.spray(G.pos.x, G.pos.z, -moveDir.x, -moveDir.z, 0.45);
       audio.footstep(sprinting);
     }
   } else if (G.footAccum > 0) {
@@ -1167,6 +1268,25 @@ function updateRemotes(dt) {
     });
     if (r.tag) r.tag.visible = !b.dead;
 
+    // collapse puff for remote players
+    if (b.dead && !r.wasDead) {
+      r.wasDead = true;
+      effects.deathBurst(x, y, z);
+      audio.impact({ x, y: y + 1, z }, camera, 'body');
+    } else if (!b.dead) {
+      r.wasDead = false;
+    }
+
+    // cold breath vapour
+    if (!b.dead) {
+      r.breathT = (r.breathT || 0) - dt;
+      if (r.breathT <= 0) {
+        r.breathT = 3.2 + Math.random() * 3.2;
+        const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+        effects.breath(x + fx * 0.30, y + 1.48, z + fz * 0.30, fx, fz);
+      }
+    }
+
     // footprints + powder for moving players
     const moved = Math.hypot(x - r.lastPos.x, z - r.lastPos.z);
     r.lastPos.set(x, y, z);
@@ -1203,6 +1323,18 @@ function sendState() {
   });
 }
 
+// Optional FPS readout (key F) with the current adaptive render scale.
+function updateFpsChip() {
+  if (!settings.showFps) return;
+  const t = performance.now();
+  if (t - (G.lastFpsUpdate || 0) < 250) return;
+  G.lastFpsUpdate = t;
+  const fps = fpsFrames > 0 ? fpsFrames / Math.max(0.001, fpsAccum) : 0;
+  ui.fpsVal.textContent = fps > 0 ? fps.toFixed(0) : '–';
+  ui.fpsVal.classList.toggle('warn', fps > 0 && fps < 50);
+  ui.fpsScale.textContent = renderScale.toFixed(2) + '×';
+}
+
 function updateHud(dt) {
   if (G.session) {
     const now = nowMs();
@@ -1213,8 +1345,19 @@ function updateHud(dt) {
     }
   }
 
+  // stamina bar + dynamic crosshair spread
+  if (ui.staminaFill) {
+    ui.staminaFill.style.width = (G.stamina * 100).toFixed(1) + '%';
+    ui.staminaWrap.classList.toggle('empty', G.stamina < 0.22);
+    ui.staminaWrap.classList.toggle('sprinting', G.staminaLock > 0);
+  }
+  const speedNow = Math.hypot(moveDir.x, moveDir.z);
+  const targetSpread = (speedNow / PLAYER.sprint) * 0.55 + (G.charging ? G.charge * 0.5 : 0) + (G.grounded ? 0 : 0.45);
+  G.spread += (targetSpread - G.spread) * Math.min(1, dt * 9);
+  ui.chargeWrap.style.setProperty('--spread', G.spread.toFixed(3));
+
   if (G.charging && G.mode === 'playing') {
-    G.charge = Math.min(1, G.charge + dt / 0.78);
+    G.charge = Math.min(1, G.charge + dt / 0.85);
     const c = 276.5 * (1 - G.charge);
     ui.chargeArc.style.strokeDashoffset = String(c);
     ui.chargeWrap.classList.toggle('full', G.charge > 0.985);
@@ -1300,6 +1443,8 @@ onResize();
 // Main loop
 // ---------------------------------------------------------------------------
 let elapsed = 0;
+let fpsAccum = 0;
+let fpsFrames = 0;
 
 function loop(fixedDt) {
   const now = performance.now();
@@ -1326,6 +1471,24 @@ function loop(fixedDt) {
   audio.setMuted?.(audio.isMuted());
 
   post.render(scene, camera, elapsed);
+  updateFpsChip();
+
+  // frame-time governor: aim for a steady 60 fps (off in debug so captures
+  // keep full quality on software renderers)
+  fpsAccum += dt;
+  fpsFrames++;
+  if (!DEBUG && fpsAccum > 1.5) {
+    const fps = fpsFrames / fpsAccum;
+    fpsAccum = 0;
+    fpsFrames = 0;
+    if (fps < 52 && renderScale > 0.61) applyRenderScale(renderScale - 0.1);
+    else if (fps > 57.5 && renderScale < 1) applyRenderScale(renderScale + 0.05);
+    else if (fps < 45 && renderScale <= 0.61 && !G.lowFx) {
+      G.lowFx = true;
+      post.setBloom(false);
+      world.setLowFx(true);
+    }
+  }
 }
 
 // Start the render loop and the menu scene
@@ -1352,7 +1515,9 @@ if (DEBUG) {
     get session() { return G.session; },
     startHost: () => ui.hostBtn.click(),
     startJoin: (code) => { ui.joinCode.value = code; ui.joinBtn.click(); },
-    step: (dt = 1 / 60) => loop(dt)
+    step: (dt = 1 / 60) => loop(dt),
+    get renderScale() { return renderScale; },
+    get fps() { return fpsFrames / Math.max(0.001, fpsAccum); }
   };
   window.__capture = (w = 720, q = 0.72) => {
     const c = document.createElement('canvas');

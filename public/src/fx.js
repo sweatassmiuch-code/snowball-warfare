@@ -326,42 +326,82 @@ export function createEffects(scene, quality = 'high') {
 
   function impact(x, y, z, kind) {
     if (kind === 'body') {
-      burst(x, y, z, { count: 30, speed: 3.1, up: 2.0, size: 0.07, life: 1.0, gravity: 7, spread: 1.6 });
-      spawnPuff(x, y, z, 1.4, 0.9, 0.7, 0.8);
+      // a full snowball shatters across the jacket
+      burst(x, y, z, { count: 40, speed: 3.6, up: 2.4, size: 0.075, life: 1.15, gravity: 7.4, spread: 1.7 });
+      burst(x, y, z, { count: 14, speed: 1.5, up: 1.0, size: 0.13, life: 0.7, gravity: 4.5, spread: 1.1 });
+      spawnPuff(x, y, z, 1.7, 1.0, 0.78, 0.9);
+      spawnPuff(x, y - 0.2, z, 1.1, 0.8, 0.5, 0.5);
     } else if (kind === 'object') {
-      burst(x, y, z, { count: 18, speed: 2.2, up: 1.4, size: 0.05, life: 0.8, gravity: 6 });
-      spawnPuff(x, y, z, 0.8, 0.6, 0.45, 0.3);
+      burst(x, y, z, { count: 24, speed: 2.5, up: 1.7, size: 0.055, life: 0.9, gravity: 6.4 });
+      spawnPuff(x, y, z, 0.95, 0.7, 0.5, 0.35);
     } else {
-      burst(x, y, z, { count: 20, speed: 2.0, up: 1.6, size: 0.055, life: 0.9, gravity: 6 });
-      spawnPuff(x, y, z, 0.7, 0.7, 0.4, 0.5);
-      addSplat(x, z, 0.9);
+      burst(x, y, z, { count: 26, speed: 2.3, up: 1.9, size: 0.06, life: 1.0, gravity: 6.2 });
+      burst(x, y, z, { count: 9, speed: 1.1, up: 0.8, size: 0.12, life: 0.6, gravity: 4.0 });
+      spawnPuff(x, y, z, 0.9, 0.8, 0.46, 0.6);
+      addSplat(x, z, 1.15);
     }
   }
 
   function deathBurst(x, y, z) {
-    burst(x, y + 1.0, z, { count: 46, speed: 2.8, up: 2.4, size: 0.07, life: 1.4, gravity: 5.5, spread: 2 });
-    spawnPuff(x, y + 1.0, z, 1.9, 1.3, 0.75, 1.1);
-    spawnPuff(x, y + 0.4, z, 1.4, 1.0, 0.5, 0.7);
+    burst(x, y + 1.0, z, { count: 60, speed: 3.2, up: 2.8, size: 0.075, life: 1.5, gravity: 5.5, spread: 2.2 });
+    burst(x, y + 0.3, z, { count: 22, speed: 1.6, up: 1.0, size: 0.14, life: 1.1, gravity: 4.2, spread: 1.6 });
+    spawnPuff(x, y + 1.0, z, 2.1, 1.4, 0.8, 1.2);
+    spawnPuff(x, y + 0.4, z, 1.6, 1.1, 0.55, 0.8);
   }
 
   function footstep(x, z, yaw, side) {
     addFootprint(x, z, yaw, side);
-    burst(x, z === undefined ? 0 : terrainHeight(x, z) + 0.04, z, {
-      count: 3, speed: 0.6, up: 0.9, size: 0.04, life: 0.5, gravity: 3.2, spread: 0.6
+    const y = terrainHeight(x, z) + 0.04;
+    burst(x, y, z, { count: 4, speed: 0.7, up: 1.0, size: 0.045, life: 0.55, gravity: 3.4, spread: 0.7 });
+  }
+
+  // Powder kicked up by boots: sprinting, hard landings, slides.
+  function spray(x, z, dirX, dirZ, power = 1) {
+    const y = terrainHeight(x, z) + 0.03;
+    const n = Math.round(2 + power * 5);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = (0.4 + Math.random() * 1.5) * power;
+      spawnParticle(
+        x + (Math.random() - 0.5) * 0.22, y, z + (Math.random() - 0.5) * 0.22,
+        -dirX * s * 0.6 + Math.cos(a) * s * 0.5,
+        0.5 + Math.random() * 1.4 * power,
+        -dirZ * s * 0.6 + Math.sin(a) * s * 0.5,
+        0.03 + Math.random() * 0.05 * power,
+        0.45 + Math.random() * 0.35,
+        5.2, 2.2
+      );
+    }
+    if (power > 0.8) spawnPuff(x, y + 0.12, z, 0.7 + power * 0.4, 0.7, 0.26, 0.35);
+  }
+
+  function landing(x, y, z, force = 1) {
+    burst(x, y + 0.04, z, {
+      count: Math.round(8 + force * 16), speed: 1.2 + force * 1.7, up: 0.7 + force,
+      size: 0.055, life: 0.85, gravity: 5.6, spread: 1.25
     });
+    spawnPuff(x, y + 0.14, z, 0.9 + force * 0.8, 0.8, 0.32, 0.42);
+    spray(x, z, 0, 0, 0.5 + force);
   }
 
   function trail(x, y, z) {
-    spawnParticle(x, y, z, (Math.random() - 0.5) * 0.15, 0.1 + Math.random() * 0.2, (Math.random() - 0.5) * 0.15, 0.022 + Math.random() * 0.02, 0.4, 0.4, 1.2);
+    spawnParticle(x, y, z,
+      (Math.random() - 0.5) * 0.10, 0.04 + Math.random() * 0.12, (Math.random() - 0.5) * 0.10,
+      0.042 + Math.random() * 0.042, 0.55 + Math.random() * 0.2, 0.85, 1.5);
+    if (Math.random() < 0.45) {
+      spawnParticle(x, y, z,
+        (Math.random() - 0.5) * 0.4, 0.15 + Math.random() * 0.35, (Math.random() - 0.5) * 0.4,
+        0.015 + Math.random() * 0.018, 0.5, 1.8, 1.1);
+    }
   }
 
   function breath(x, y, z, dx, dz) {
-    spawnPuff(x, y, z, 0.45, 1.1, 0.3, 0.6);
-    burst(x, y, z, { count: 2, speed: 0.5, up: 0.3, size: 0.05, life: 0.7, gravity: -0.2, spread: 0.4 });
+    spawnPuff(x, y, z, 0.5, 1.25, 0.32, 0.65);
+    burst(x, y, z, { count: 3, speed: 0.55, up: 0.35, size: 0.055, life: 0.8, gravity: -0.25, spread: 0.45 });
   }
 
   return {
-    update, burst, spawnPuff, impact, deathBurst, footstep, trail, breath,
+    update, burst, spawnPuff, impact, deathBurst, footstep, trail, breath, spray, landing,
     createBallMesh, addFootprint, addSplat
   };
 }

@@ -31,6 +31,7 @@ läuft auf jedem Static-Host (Vercel, GitHub Pages, Netlify …).
 | `Linke Maustaste` | Schneeball aufladen & werfen |
 | `Tab` | Rangliste |
 | `M` | Ton an/aus |
+| `F` | FPS-Anzeige (mit Render-Skalierung) |
 | `Esc` | Pause |
 
 ---
@@ -48,6 +49,22 @@ Damit funktioniert das Spiel auf Vercel & Co., ohne WebSocket-Server.
 Maximal 8 menschliche Spieler pro Raum, beliebig viele Zuschauer-Bots.
 
 ---
+
+## Tests
+
+```bash
+node tools/test-round.mjs   # Wurf, Treffer, Kill, Respawn, Schutz, Ablehnungen
+```
+
+Der Test läuft die autoritative Simulation (`public/shared/sim.js`) ohne Browser
+durch und prüft Treffer, Punktestand, Respawn-Timer und Spawn-Schutz.
+
+## Performance
+
+Das Spiel hält die Bildrate selbst: Ein Governor skaliert die Renderauflösung
+(1.00× → 0.60×) und schaltet bei Bedarf Bloom, Schneefall, Glitzer und Nebel
+ab, ohne Simulation oder Netzwerk zu verändern. Die aktuelle Stufe steht in der
+optionalen FPS-Anzeige (`F`).
 
 ## Lokal starten
 

@@ -245,15 +245,21 @@ const skyFrag = /* glsl */`
 
     // Sun disk + bloom
     float sd = max(dot(d, normalize(uSunDir)), 0.0);
-    col += vec3(1.0, 0.80, 0.55) * pow(sd, 1400.0) * 9.0;
-    col += vec3(1.0, 0.75, 0.48) * pow(sd, 26.0) * 0.30;
+    col += vec3(1.0, 0.80, 0.55) * pow(sd, 1400.0) * 5.5;
+    col += vec3(1.0, 0.75, 0.48) * pow(sd, 26.0) * 0.24;
     col += vec3(1.0, 0.84, 0.64) * pow(sd, 6.0) * 0.07;
 
-    // Thin cirrus bands
+    // two drifting cloud decks, lit from the sun side
     vec2 cuv = vec2(atan(d.z, d.x) * 1.6, d.y * 5.2);
-    float cl = fbm(cuv * 1.3 + vec2(uTime * 0.003, 0.0));
-    cl = smoothstep(0.52, 0.85, cl) * smoothstep(0.02, 0.30, d.y);
-    col = mix(col, vec3(0.88, 0.92, 0.97), cl * 0.22);
+    float c1 = fbm(cuv * 1.05 + vec2(uTime * 0.0025, 0.0));
+    float c2 = fbm(cuv * 2.8 + vec2(-uTime * 0.0016, 1.7));
+    float band = smoothstep(0.01, 0.24, d.y) * (1.0 - smoothstep(0.14, 0.88, d.y));
+    float cl = smoothstep(0.47, 0.86, c1 * 0.66 + c2 * 0.34) * band;
+    vec3 cloudCol = mix(vec3(0.76, 0.82, 0.90), vec3(1.0, 0.95, 0.89), pow(sd, 3.0) * 0.8);
+    col = mix(col, cloudCol, cl * 0.40);
+
+    // sun haze along the horizon
+    col += vec3(1.0, 0.83, 0.64) * pow(max(sd, 0.0), 3.0) * (1.0 - smoothstep(-0.03, 0.34, d.y)) * 0.18;
 
     gl_FragColor = vec4(col, 1.0);
   }
@@ -278,8 +284,8 @@ function makeSkyMaterial() {
 // ---------------------------------------------------------------------------
 export function createWorld(renderer, quality = 'high') {
   const scene = new THREE.Scene();
-  const fogColor = new THREE.Color(0xaebfce);
-  scene.fog = new THREE.FogExp2(fogColor, 0.0033);
+  const fogColor = new THREE.Color(0xb2c5d6);
+  scene.fog = new THREE.FogExp2(fogColor, 0.0029);
 
   const q = quality === 'low' ? 0 : quality === 'mid' ? 1 : 2;
 
@@ -298,25 +304,29 @@ export function createWorld(renderer, quality = 'high') {
   pmrem.dispose();
 
   // Lights
-  const hemi = new THREE.HemisphereLight(0xa8caee, 0xaebfcd, 0.55);
+  const hemi = new THREE.HemisphereLight(0x9cc2ec, 0xb9c7d4, 0.40);
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xffeacb, 2.55);
+  const sun = new THREE.DirectionalLight(0xfff2da, 3.05);
   sun.position.copy(SUN_DIR).multiplyScalar(120);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(q === 0 ? 1024 : q === 1 ? 2048 : 2048, q === 0 ? 1024 : 2048);
-  sun.shadow.camera.left = -46; sun.shadow.camera.right = 46;
-  sun.shadow.camera.top = 46; sun.shadow.camera.bottom = -46;
+  sun.shadow.mapSize.set(q === 2 ? 1536 : 1024, q === 2 ? 1536 : 1024);
+  sun.shadow.camera.left = -38; sun.shadow.camera.right = 38;
+  sun.shadow.camera.top = 38; sun.shadow.camera.bottom = -38;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 260;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.09;
+  sun.shadow.bias = -0.00035;
+  sun.shadow.normalBias = 0.075;
   scene.add(sun);
   scene.add(sun.target);
 
-  // Fill light from the snow
-  const bounce = new THREE.DirectionalLight(0xcfe2f7, 0.18);
+  // Cool fill from the snowfield, warm bounce from the low sun
+  const bounce = new THREE.DirectionalLight(0xcfe2f7, 0.26);
   bounce.position.set(30, 18, 40);
   scene.add(bounce);
+
+  const rim = new THREE.DirectionalLight(0xffd7a8, 0.35);
+  rim.position.set(-SUN_DIR.x * 60, 26, -SUN_DIR.z * 60);
+  scene.add(rim);
 
   // -------------------------------------------------------------------------
   // Terrain
@@ -325,7 +335,7 @@ export function createWorld(renderer, quality = 'high') {
   const snowColor = makeSnowColor();
 
   const TERRAIN_SIZE = 620;
-  const seg = q === 0 ? 180 : 300;
+  const seg = q === 0 ? 160 : 240;
   const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, seg, seg);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -497,8 +507,11 @@ export function createWorld(renderer, quality = 'high') {
       tint.setRGB(0.052 * v, 0.115 * v, 0.072 * v);
       foliage.setColorAt(fi, tint);
 
-      dummy.position.y = y + layerH * 0.72;
-      dummy.scale.set(rad * 0.97, layerH * 0.19, rad * 0.97);
+            dummy.position.y = y + layerH * 0.60;
+      dummy.position.x += (rnd() - 0.5) * 0.18;
+      dummy.position.z += (rnd() - 0.5) * 0.18;
+
+      dummy.scale.set(rad * (0.80 + rnd() * 0.10), layerH * 0.26, rad * (0.80 + rnd() * 0.10));
       dummy.updateMatrix();
       snowCaps.setMatrixAt(fi, dummy.matrix);
       fi++;
@@ -716,23 +729,148 @@ export function createWorld(renderer, quality = 'high') {
   scene.add(fence);
 
   // -------------------------------------------------------------------------
+  // Cabin yard: woodpile, lanterns, sled, stumps, a fallen log
+  // -------------------------------------------------------------------------
+  const barkMat = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.95, envMapIntensity: 0.15 });
+  const cutMat = new THREE.MeshStandardMaterial({ color: 0xb08a5e, roughness: 0.85 });
+  const yard = new THREE.Group();
+
+  const pileX = CABIN.x + 4.4, pileZ = CABIN.z + 4.6;
+  const pileY = terrainHeight(pileX, pileZ);
+  for (let row = 0; row < 3; row++) {
+    for (let i = 0; i < 6 - row; i++) {
+      const lx = (i - (5 - row) / 2) * 0.28;
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, 1.5, 8), barkMat);
+      log.rotation.z = Math.PI / 2;
+      log.position.set(pileX + lx, pileY + 0.16 + row * 0.24, pileZ);
+      log.castShadow = true; log.receiveShadow = true;
+      yard.add(log);
+      const cut = new THREE.Mesh(new THREE.CircleGeometry(0.125, 8), cutMat);
+      cut.position.set(pileX + lx + 0.755, pileY + 0.16 + row * 0.24, pileZ);
+      cut.rotation.y = Math.PI / 2;
+      yard.add(cut);
+    }
+  }
+  const pileSnow = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.12, 0.44), snowCapMat);
+  pileSnow.position.set(pileX, pileY + 0.88, pileZ);
+  pileSnow.castShadow = true;
+  yard.add(pileSnow);
+
+  const lanternGlowTex = makeSoftDisc(true);
+  const lanternSpots = [[CABIN.x + 3.4, CABIN.z + 6.2], [CABIN.x + 10.5, CABIN.z + 4.6]];
+  for (const [lx, lz] of lanternSpots) {
+    const ly = terrainHeight(lx, lz);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.3, 0.12), fenceMat);
+    post.position.set(lx, ly + 1.15, lz);
+    post.castShadow = true;
+    yard.add(post);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.08, 0.08), fenceMat);
+    arm.position.set(lx + 0.2, ly + 2.24, lz);
+    yard.add(arm);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.28, 0.20), new THREE.MeshStandardMaterial({
+      color: 0x2a2118, roughness: 0.6, metalness: 0.3, emissive: 0xff9d45, emissiveIntensity: 2.2
+    }));
+    lamp.position.set(lx + 0.42, ly + 2.02, lz);
+    yard.add(lamp);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: lanternGlowTex, color: 0xffb45e, transparent: true, opacity: 0.45,
+      depthWrite: false, blending: THREE.AdditiveBlending
+    }));
+    glow.position.set(lx + 0.42, ly + 2.0, lz);
+    glow.scale.set(2.4, 2.4, 1);
+    yard.add(glow);
+    const light = new THREE.PointLight(0xffa85a, 5.5, 14, 2);
+    light.position.set(lx + 0.42, ly + 2.05, lz);
+    yard.add(light);
+  }
+
+  const sled = new THREE.Group();
+  const sledX = CABIN.x - 5.2, sledZ = CABIN.z + 5.4;
+  sled.position.set(sledX, terrainHeight(sledX, sledZ) + 0.12, sledZ);
+  sled.rotation.y = 0.7;
+  const runnerMat = new THREE.MeshStandardMaterial({ color: 0x8b2f2a, roughness: 0.5, metalness: 0.25 });
+  for (const side of [-1, 1]) {
+    const runner = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 1.5), runnerMat);
+    runner.position.set(side * 0.22, 0, 0);
+    sled.add(runner);
+    const upright = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.05), fenceMat);
+    upright.position.set(side * 0.22, 0.14, 0.35);
+    sled.add(upright);
+  }
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 1.1), fenceMat);
+  deck.position.y = 0.16;
+  deck.castShadow = true;
+  sled.add(deck);
+  const sledSnow = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.05, 1.05), snowCapMat);
+  sledSnow.position.y = 0.20;
+  sled.add(sledSnow);
+  yard.add(sled);
+
+  for (let i = 0; i < 5; i++) {
+    const a = rnd() * Math.PI * 2, r = 26 + rnd() * 46;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const h = 0.35 + rnd() * 0.4;
+    const y = terrainHeight(x, z);
+    const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.28 + rnd() * 0.16, 0.34, h, 9), barkMat);
+    stump.position.set(x, y + h / 2 - 0.05, z);
+    stump.castShadow = true; stump.receiveShadow = true;
+    yard.add(stump);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.30, 0.07, 9), snowCapMat);
+    cap.position.set(x, y + h - 0.02, z);
+    yard.add(cap);
+  }
+
+  const fallenX = 14, fallenZ = -12;
+  const fallenY = terrainHeight(fallenX, fallenZ);
+  const fallen = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.30, 3.4, 9), barkMat);
+  fallen.position.set(fallenX, fallenY + 0.26, fallenZ);
+  fallen.rotation.set(0, 0.6, Math.PI / 2 - 0.05);
+  fallen.castShadow = true; fallen.receiveShadow = true;
+  yard.add(fallen);
+  const fallenSnow = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.10, 0.46), snowCapMat);
+  fallenSnow.position.set(fallenX, fallenY + 0.50, fallenZ);
+  fallenSnow.rotation.y = 0.6;
+  fallenSnow.castShadow = true;
+  yard.add(fallenSnow);
+
+  scene.add(yard);
+
+  // -------------------------------------------------------------------------
   // Distant mountains
   // -------------------------------------------------------------------------
   const mountains = new THREE.Group();
   const mtMat = new THREE.MeshStandardMaterial({ color: 0x8ca7c2, roughness: 1, flatShading: true });
   const mtSnow = new THREE.MeshStandardMaterial({ color: 0xe4eef9, roughness: 0.9, flatShading: true });
   const mr = mulberry32(555);
+  // displaced cone silhouettes read as rock ridges instead of paper pyramids
+  function craggy(geo, height, seed) {
+    const p = geo.attributes.position;
+    for (let vi = 0; vi < p.count; vi++) {
+      const vx = p.getX(vi), vy = p.getY(vi), vz = p.getZ(vi);
+      if (Math.abs(vy) > height * 0.49) continue;
+      const n = fbm(vx * 0.012 + seed, vz * 0.012 - seed, 3) - 0.5;
+      const n2 = fbm(vx * 0.05 - seed, vz * 0.05 + seed, 2) - 0.5;
+      const s = 1 + n * 0.35 + n2 * 0.12;
+      p.setXYZ(vi, vx * s, vy + n2 * height * 0.10, vz * s);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }
+
   for (let i = 0; i < 18; i++) {
     const a = (i / 18) * Math.PI * 2 + mr() * 0.25;
     const r = 300 + mr() * 150;
     const h = 90 + mr() * 170;
     const rad = 90 + mr() * 130;
-    const mt = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 5 + (mr() * 3 | 0)), mtMat);
+    const seed = mr() * 60;
+    const mtGeo = craggy(new THREE.ConeGeometry(rad, h, 16, 6), h, seed);
+    const mt = new THREE.Mesh(mtGeo, mtMat);
     mt.position.set(Math.cos(a) * r, h / 2 - 40, Math.sin(a) * r);
     mt.rotation.y = mr() * Math.PI;
     mountains.add(mt);
 
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(rad * 0.45, h * 0.42, 5), mtSnow);
+    const capGeo = craggy(new THREE.ConeGeometry(rad * 0.47, h * 0.42, 16, 3), h * 0.42, seed + 9);
+    const cap = new THREE.Mesh(capGeo, mtSnow);
     cap.position.set(mt.position.x, mt.position.y + h * 0.29, mt.position.z);
     cap.rotation.y = mt.rotation.y;
     mountains.add(cap);
@@ -742,7 +880,7 @@ export function createWorld(renderer, quality = 'high') {
   // -------------------------------------------------------------------------
   // Snowfall
   // -------------------------------------------------------------------------
-  const snowCount = q === 0 ? 1800 : q === 1 ? 4500 : 7500;
+  const snowCount = q === 0 ? 1500 : q === 1 ? 3600 : 6000;
   const snowGeo = new THREE.BufferGeometry();
   const base = new Float32Array(snowCount * 3);
   const phase = new Float32Array(snowCount);
@@ -782,8 +920,9 @@ export function createWorld(renderer, quality = 'high') {
         vec3 p = position;
         float t = uTime;
         p.y -= t * aFall;
-        p.x += sin(t * 0.55 + aPhase) * 1.4 + t * 1.1;
-        p.z += cos(t * 0.43 + aPhase * 1.7) * 1.1 + t * 0.25;
+        float gust = sin(t * 0.23 + aPhase * 0.4) * 0.6 + sin(t * 0.07) * 0.4;
+        p.x += sin(t * 0.55 + aPhase) * 1.4 + t * (1.1 + gust * 0.5);
+        p.z += cos(t * 0.43 + aPhase * 1.7) * 1.1 + t * (0.25 + gust * 0.2);
         vec3 rel = mod(p - uCenter + vec3(36.0, 22.0, 36.0), vec3(72.0, 44.0, 72.0)) - vec3(36.0, 22.0, 36.0);
         vec3 wp = uCenter + rel;
         vec4 mv = modelViewMatrix * vec4(wp, 1.0);
@@ -811,7 +950,7 @@ export function createWorld(renderer, quality = 'high') {
   // -------------------------------------------------------------------------
   // Sparkling snow crystals
   // -------------------------------------------------------------------------
-  const sparkCount = q === 0 ? 800 : q === 1 ? 2200 : 3800;
+  const sparkCount = q === 0 ? 600 : q === 1 ? 1600 : 2600;
   const sparkGeo = new THREE.BufferGeometry();
   const sp = new Float32Array(sparkCount * 3);
   const sph = new Float32Array(sparkCount);
@@ -956,7 +1095,15 @@ export function createWorld(renderer, quality = 'high') {
     snowU.uPixelRatio.value = level;
   }
 
-  return { scene, sun, sky, terrain, update, setSnowQuality, sunDir: SUN_DIR, fogColor };
+  // Cheap tier used when a machine cannot hold the frame budget: drop the
+  // animated snowfall, ground sparkle and mist, keep the world intact.
+  function setLowFx(on) {
+    snowfall.visible = !on;
+    sparkles.visible = !on;
+    for (const m of mists) m.visible = !on;
+  }
+
+  return { scene, sun, sky, terrain, update, setSnowQuality, setLowFx, sunDir: SUN_DIR, fogColor };
 }
 
 // Soft radial disc used for mist, smoke and drifts

@@ -51,6 +51,7 @@ button { font-family: inherit; color: inherit; }
   border-radius: 3px;
   font-size: 10px; letter-spacing: 0.14em; color: var(--ice-dim);
   white-space: nowrap;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
 }
 .chip b { color: var(--ice); letter-spacing: 0.22em; font-size: 11px; }
 .chip .label { color: rgba(210, 232, 255, 0.45); }
@@ -61,6 +62,11 @@ button { font-family: inherit; color: inherit; }
   background: rgba(7, 14, 23, 0.55);
 }
 .chip.action:hover { border-color: var(--accent); color: var(--ice); background: rgba(24, 48, 70, 0.6); }
+
+.chip.perf { font-variant-numeric: tabular-nums; }
+.chip.perf b { min-width: 24px; text-align: right; font-size: 12px; }
+.chip.perf b.warn { color: var(--danger); }
+.chip.perf .tiny { font-size: 8px; letter-spacing: 0.06em; color: rgba(210, 232, 255, 0.45); }
 
 .dot-live {
   width: 5px; height: 5px; border-radius: 50%;
@@ -90,6 +96,7 @@ button { font-family: inherit; color: inherit; }
 
 /* Crosshair + charge ring */
 #chargeWrap {
+  --spread: 0;
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 120px; height: 120px;
   display: grid; place-items: center;
@@ -108,9 +115,13 @@ button { font-family: inherit; color: inherit; }
 .ch { position: absolute; background: rgba(240, 249, 255, 0.9); box-shadow: 0 0 4px rgba(0, 0, 0, 0.8); display: block; }
 .ch.dot { width: 2.5px; height: 2.5px; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; }
 .ch.t, .ch.b { width: 1.5px; height: 6px; left: 50%; transform: translateX(-50%); }
-.ch.t { top: -7px; } .ch.b { bottom: -7px; }
+.ch.t { top: calc(-7px - var(--spread, 0) * 16px); }
+.ch.b { bottom: calc(-7px - var(--spread, 0) * 16px); }
 .ch.l, .ch.r { width: 6px; height: 1.5px; top: 50%; transform: translateY(-50%); }
-.ch.l { left: -7px; } .ch.r { right: -7px; }
+.ch.l { left: calc(-7px - var(--spread, 0) * 16px); }
+.ch.r { right: calc(-7px - var(--spread, 0) * 16px); }
+.ch.t, .ch.b { transition: top 0.08s linear, bottom 0.08s linear; }
+.ch.l, .ch.r { transition: left 0.08s linear, right 0.08s linear; }
 
 #chargeLabel {
   position: absolute; left: 50%; top: calc(50% + 76px); transform: translateX(-50%);
@@ -119,7 +130,7 @@ button { font-family: inherit; color: inherit; }
 }
 #chargeLabel.show { opacity: 1; }
 
-#hitmarker { position: absolute; width: 30px; height: 30px; opacity: 0; }
+#hitmarker { position: absolute; width: 30px; height: 30px; opacity: 0; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55)); }
 #hitmarker i { position: absolute; width: 8px; height: 1.6px; background: #fff; box-shadow: 0 0 6px #fff; }
 #hitmarker i:nth-child(1) { left: 1px; top: 5px; transform: rotate(45deg); }
 #hitmarker i:nth-child(2) { right: 1px; top: 5px; transform: rotate(-45deg); }
@@ -137,8 +148,24 @@ button { font-family: inherit; color: inherit; }
   position: absolute; bottom: 16px; left: 20px; right: 20px;
   display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
 }
-#hint { font-size: 10px; letter-spacing: 0.08em; color: rgba(210, 230, 250, 0.4); max-width: 60%; line-height: 1.6; }
-#stance { font-size: 9px; letter-spacing: 0.22em; color: rgba(255, 150, 130, 0.42); }
+#hint { font-size: 10px; letter-spacing: 0.08em; color: rgba(210, 230, 250, 0.4); max-width: 52%; line-height: 1.6; }
+#stance { font-size: 9px; letter-spacing: 0.22em; color: rgba(255, 150, 130, 0.42); white-space: nowrap; }
+
+#staminaWrap {
+  position: relative; flex: 1 1 auto; max-width: 220px; height: 3px;
+  align-self: center; margin-bottom: 5px;
+  background: rgba(200, 228, 255, 0.13);
+  border-radius: 2px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(200, 228, 255, 0.06);
+}
+#staminaFill {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, rgba(143, 211, 255, 0.5), #d3edff);
+  transition: width 0.08s linear, background 0.25s ease, box-shadow 0.25s ease;
+}
+#staminaWrap.sprinting #staminaFill { box-shadow: 0 0 10px rgba(143, 211, 255, 0.8); }
+#staminaWrap.empty #staminaFill { background: linear-gradient(90deg, rgba(255, 150, 120, 0.55), #ffb692); }
+#staminaWrap.empty { box-shadow: inset 0 0 0 1px rgba(255, 150, 120, 0.3); }
 
 #toast {
   position: absolute; left: 50%; top: 88px; transform: translateX(-50%);
