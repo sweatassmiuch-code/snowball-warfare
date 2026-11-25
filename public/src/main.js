@@ -131,12 +131,13 @@ const post = (() => {
     uniforms: {
       tScene: { value: null }, tBloom: { value: null },
       uTime: { value: 0 }, uExposure: { value: 0.78 }, uBloom: { value: 0.34 },
-      uDesat: { value: 0 }, uFlash: { value: 0 }, uGrain: { value: 1 }, uFrost: { value: 0.55 }
+      uDesat: { value: 0 }, uFlash: { value: 0 }, uGrain: { value: 1 }, uFrost: { value: 0.55 },
+      uFocus: { value: 0 }
     },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
     fragmentShader: `
       uniform sampler2D tScene; uniform sampler2D tBloom;
-      uniform float uTime, uExposure, uBloom, uDesat, uFlash, uGrain, uFrost;
+      uniform float uTime, uExposure, uBloom, uDesat, uFlash, uGrain, uFrost, uFocus;
       varying vec2 vUv;
 
       vec3 aces(vec3 x) {
@@ -171,8 +172,12 @@ const post = (() => {
         float l2 = dot(col, vec3(0.299, 0.587, 0.114));
         col = mix(vec3(l2), col, 1.12);
 
-        float vig = smoothstep(1.0, 0.15, r2 * 1.85);
-        col *= mix(0.42, 1.0, vig);
+        // focus freeze: cold tunnel vision with the bloom pushed forward
+        col = mix(col, col * vec3(0.86, 0.96, 1.12), uFocus * 0.55);
+        col += bloom * uFocus * 0.22;
+
+        float vig = smoothstep(1.0, 0.15, r2 * (1.85 + uFocus * 1.35));
+        col *= mix(0.42 - 0.16 * uFocus, 1.0, vig);
 
         // faint breath of frost right at the corners of the lens
         float fn2 = hash(floor(uv * vec2(70.0, 44.0)) + 11.0);
@@ -341,7 +346,8 @@ const G = {
   landDip: 0,
   spread: 0,
   lastNear: 0,
-  lowFx: false
+  lowFx: false,
+  focus: 0
 };
 
 const isPlaying = () => G.session && !G.dead && G.mode === 'playing';
@@ -1043,7 +1049,7 @@ function updateProjectiles(dt) {
 const moveDir = new THREE.Vector3();
 const wishDir = new THREE.Vector3();
 
-function updateLocalPlayer(dt) {
+function updateLocalPlayer(dt, realDt = dt) {
   if (!G.spawned || !G.session) return;
 
   const alive = !G.dead;
@@ -1181,7 +1187,7 @@ function updateLocalPlayer(dt) {
   // FOV
   const sprintFov = (sprinting && speed > 1 && !G.dead) ? 2.5 : 0;
   G.fovKick *= Math.max(0, 1 - dt * 6);
-  const targetFov = 76 + sprintFov + (G.dead ? 8 : 0) + G.fovKick;
+  const targetFov = 76 + sprintFov + (G.dead ? 8 : 0) + G.fovKick - G.focus * 2.6;
   camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
   camera.updateProjectionMatrix();
 
@@ -1202,7 +1208,7 @@ function updateLocalPlayer(dt) {
 
   // breath vapor
   if (!G.dead && G.mode === 'playing') {
-    G.breathTimer -= dt;
+    G.breathTimer -= realDt;
     if (G.breathTimer <= 0) {
       G.breathTimer = 2.8 + Math.random() * 1.6;
       const dir = new THREE.Vector3();
@@ -1219,10 +1225,10 @@ function updateLocalPlayer(dt) {
   // viewmodel
   const swayX = THREE.MathUtils.clamp(G.mouseSwayX, -14, 14);
   const swayY = THREE.MathUtils.clamp(G.mouseSwayY, -14, 14);
-  G.mouseSwayX *= Math.max(0, 1 - dt * 7);
-  G.mouseSwayY *= Math.max(0, 1 - dt * 7);
+  G.mouseSwayX *= Math.max(0, 1 - realDt * 7);
+  G.mouseSwayY *= Math.max(0, 1 - realDt * 7);
 
-  viewmodel.update(dt, {
+  viewmodel.update(realDt, {
     speed, sprinting, charging: G.charge,
     swayX, swayY, grounded: G.grounded
   });
@@ -1361,8 +1367,10 @@ function updateHud(dt) {
     const c = 276.5 * (1 - G.charge);
     ui.chargeArc.style.strokeDashoffset = String(c);
     ui.chargeWrap.classList.toggle('full', G.charge > 0.985);
-    G.chargeLabel.textContent = G.charge > 0.985 ? 'MAXIMALE WUCHT' : 'WUCHT ' + Math.round(G.charge * 100) + '%';
+    const power = G.charge > 0.985 ? 'MAXIMALE WUCHT' : 'WUCHT ' + Math.round(G.charge * 100) + '%';
+    G.chargeLabel.textContent = power + ' · ZEITLUPE';
   }
+  post.composite.uniforms.uFocus.value = G.focus;
 
   if (G.cooldown > 0) G.cooldown = Math.max(0, G.cooldown - dt);
 
@@ -1454,20 +1462,27 @@ function loop(fixedDt) {
   dt = Math.min(dt, 0.05);
   elapsed += dt;
 
+  // Focus freeze: while a throw is wound up the whole world holds still,
+  // then snaps back into motion the moment the ball leaves the hand.
+  const wantFocus = G.charging && !!G.session && G.mode === 'playing' && !G.dead;
+  G.focus += ((wantFocus ? 1 : 0) - G.focus) * Math.min(1, dt * (wantFocus ? 16 : 9));
+  if (G.focus < 0.002) G.focus = 0;
+  const worldDt = dt * (1 - G.focus * 0.97);
+
   if (G.session) {
-    G.session.tick(dt);
-    updateLocalPlayer(dt);
-    updateRemotes(dt);
-    updateProjectiles(dt);
+    G.session.tick(worldDt);
+    updateLocalPlayer(worldDt, dt);
+    updateRemotes(worldDt);
+    updateProjectiles(worldDt);
     sendState();
     updateHud(dt);
-    world.update(dt, camera, G.pos);
+    world.update(worldDt, camera, G.pos);
   } else {
     menuCamera(dt);
     world.update(dt, camera, camera.position);
   }
 
-  effects.update(dt, camera);
+  effects.update(worldDt, camera);
   audio.setMuted?.(audio.isMuted());
 
   post.render(scene, camera, elapsed);

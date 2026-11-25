@@ -65,6 +65,40 @@ function bumpCanvas(size, fn) {
 
 const texCache = new Map();
 
+// Tangent-space normal map derived from the same height field as the bump map.
+// Gives fabric, knit, leather and skin a crisp lit relief instead of a soft blur.
+function normalTexture(key, size, fn, strength = 2) {
+  const cacheKey = 'n:' + key;
+  if (texCache.has(cacheKey)) return texCache.get(cacheKey);
+  const h = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) h[y * size + x] = fn(x, y, size) / 255;
+  }
+  const at = (x, y) => h[((y + size) % size) * size + ((x + size) % size)];
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * size + x) * 4;
+      img.data[i] = (-dx / len * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (-dy / len * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (1 / len * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  texCache.set(cacheKey, tex);
+  return tex;
+}
+
 function bumpTexture(key, size, fn) {
   if (texCache.has(key)) return texCache.get(key);
   const c = bumpCanvas(size, fn);
@@ -75,42 +109,46 @@ function bumpTexture(key, size, fn) {
   return tex;
 }
 
-// Tight woven shell fabric
-const fabricBump = () => bumpTexture('fabric', 256, (x, y) => {
+// Height fields shared by the bump and normal map builders
+const fabricH = (x, y) => {
   const weave = Math.sin(x * 1.9) * Math.cos(y * 1.9) * 12;
   const slub = (fbm2(x * 0.06, y * 0.06, 3) - 0.5) * 40;
   const grain = (hash2(x, y) - 0.5) * 22;
   return 128 + weave + slub + grain;
-});
-
-// Ribbed knit for scarves, beanies and cuffs
-const knitBump = () => bumpTexture('knit', 256, (x, y) => {
+};
+const knitH = (x, y) => {
   const rib = Math.sin(x * 0.62) * 34;
   const stitch = Math.sin(y * 1.35 + Math.sin(x * 0.62) * 1.4) * 20;
   const fuzz = (hash2(x * 3, y * 3) - 0.5) * 26;
   return 128 + rib + stitch + fuzz;
-});
-
-// Pebbled leather for gloves and boots
-const leatherBump = () => bumpTexture('leather', 256, (x, y) => {
+};
+const leatherH = (x, y) => {
   const pebble = fbm2(x * 0.24, y * 0.24, 3) * 70;
   const pores = (hash2(x * 1.7, y * 1.7) - 0.5) * 30;
   return 96 + pebble + pores;
-});
-
-// Twill denim for trousers
-const denimBump = () => bumpTexture('denim', 256, (x, y) => {
+};
+const denimH = (x, y) => {
   const twill = Math.sin((x + y) * 1.05) * 24;
   const slub = (fbm2(x * 0.09, y * 0.09, 2) - 0.5) * 26;
   return 128 + twill + slub;
-});
-
-// Fine pores for skin
-const skinBump = () => bumpTexture('skin', 128, (x, y) => {
+};
+const skinH = (x, y) => {
   const pores = fbm2(x * 0.5, y * 0.5, 3) * 46;
   const fine = (hash2(x * 2, y * 2) - 0.5) * 14;
   return 108 + pores + fine;
-});
+};
+
+const fabricBump = () => bumpTexture('fabric', 256, fabricH);
+const knitBump = () => bumpTexture('knit', 256, knitH);
+const leatherBump = () => bumpTexture('leather', 256, leatherH);
+const denimBump = () => bumpTexture('denim', 256, denimH);
+const skinBump = () => bumpTexture('skin', 128, skinH);
+
+const fabricNormal = () => normalTexture('fabric', 256, fabricH, 2.6);
+const knitNormal = () => normalTexture('knit', 256, knitH, 3.0);
+const leatherNormal = () => normalTexture('leather', 256, leatherH, 2.2);
+const denimNormal = () => normalTexture('denim', 256, denimH, 2.0);
+const skinNormal = () => normalTexture('skin', 128, skinH, 1.1);
 
 // ---------------------------------------------------------------------------
 // Materials
@@ -127,45 +165,54 @@ function materialsFor(idx) {
   const m = {
     jacket: new THREE.MeshPhysicalMaterial({
       color: jacketColor, roughness: 0.88, metalness: 0,
-      bumpMap: fabricBump(), bumpScale: 0.7,
-      sheen: 0.22, sheenRoughness: 0.9, sheenColor: new THREE.Color(0x7d8b99),
-      envMapIntensity: 0.4
+      normalMap: fabricNormal(), normalScale: new THREE.Vector2(0.42, 0.42),
+      sheen: 0.3, sheenRoughness: 0.86, sheenColor: new THREE.Color(0x8d9baa),
+      envMapIntensity: 0.5
     }),
     jacketDark: new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(jacketColor).multiplyScalar(0.92), roughness: 0.9, metalness: 0,
-      bumpMap: fabricBump(), bumpScale: 0.7, sheen: 0.18, sheenRoughness: 0.92, envMapIntensity: 0.35
+      normalMap: fabricNormal(), normalScale: new THREE.Vector2(0.38, 0.38),
+      sheen: 0.24, sheenRoughness: 0.9, envMapIntensity: 0.42
     }),
     pants: new THREE.MeshStandardMaterial({
       color: 0x2a3340, roughness: 0.93, metalness: 0,
-      bumpMap: denimBump(), bumpScale: 1.0, envMapIntensity: 0.35
+      normalMap: denimNormal(), normalScale: new THREE.Vector2(0.55, 0.55), envMapIntensity: 0.35
     }),
     scarf: new THREE.MeshPhysicalMaterial({
       color: scarfColor, roughness: 0.97, metalness: 0,
-      bumpMap: knitBump(), bumpScale: 1.4,
-      sheen: 0.28, sheenRoughness: 0.95, sheenColor: new THREE.Color(0xc9d2da), envMapIntensity: 0.25
+      normalMap: knitNormal(), normalScale: new THREE.Vector2(0.85, 0.85),
+      sheen: 0.42, sheenRoughness: 0.9, sheenColor: new THREE.Color(0xd6dee6), envMapIntensity: 0.3
     }),
     beanie: new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(scarfColor).multiplyScalar(0.86),
-      roughness: 0.98, metalness: 0, bumpMap: knitBump(), bumpScale: 1.5,
-      sheen: 0.24, sheenRoughness: 0.96, sheenColor: new THREE.Color(0xc9d2da), envMapIntensity: 0.22
+      roughness: 0.98, metalness: 0,
+      normalMap: knitNormal(), normalScale: new THREE.Vector2(0.9, 0.9),
+      sheen: 0.36, sheenRoughness: 0.92, sheenColor: new THREE.Color(0xd6dee6), envMapIntensity: 0.26
     }),
-    skin: new THREE.MeshStandardMaterial({
-      color: skinColor, roughness: 0.62, metalness: 0,
-      bumpMap: skinBump(), bumpScale: 0.35, envMapIntensity: 0.35
+    // Skin reads much more human with a touch of sheen and a warm subsurface tint
+    skin: new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(skinColor).multiplyScalar(0.94), roughness: 0.62, metalness: 0,
+      normalMap: skinNormal(), normalScale: new THREE.Vector2(0.06, 0.06),
+      sheen: 0.5, sheenRoughness: 0.72, sheenColor: new THREE.Color(0xf0b49c),
+      clearcoat: 0.05, clearcoatRoughness: 0.7, envMapIntensity: 0.42
+    }),
+    skinShadow: new THREE.MeshStandardMaterial({
+      color: new THREE.Color(skinColor).multiplyScalar(0.78), roughness: 0.7, metalness: 0,
+      envMapIntensity: 0.2
     }),
     skinRed: new THREE.MeshStandardMaterial({
-      color: new THREE.Color(skinColor).lerp(new THREE.Color(0xd0664f), 0.32),
+      color: new THREE.Color(skinColor).lerp(new THREE.Color(0xd0664f), 0.24),
       roughness: 0.6, metalness: 0, envMapIntensity: 0.3
     }),
     hair: new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0 }),
     leather: new THREE.MeshPhysicalMaterial({
       color: 0x1d2126, roughness: 0.58, metalness: 0.04,
-      bumpMap: leatherBump(), bumpScale: 1.2,
-      clearcoat: 0.35, clearcoatRoughness: 0.55, envMapIntensity: 0.8
+      normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.7, 0.7),
+      clearcoat: 0.35, clearcoatRoughness: 0.55, envMapIntensity: 0.9
     }),
     boot: new THREE.MeshPhysicalMaterial({
       color: 0x191d21, roughness: 0.66, metalness: 0.03,
-      bumpMap: leatherBump(), bumpScale: 1.4, envMapIntensity: 0.55
+      normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.8, 0.8), envMapIntensity: 0.6
     }),
     sole: new THREE.MeshStandardMaterial({ color: 0x0e1013, roughness: 0.9, metalness: 0 }),
     metal: new THREE.MeshStandardMaterial({ color: 0x9aa4ad, roughness: 0.32, metalness: 0.9, envMapIntensity: 1.2 }),
@@ -177,8 +224,10 @@ function materialsFor(idx) {
     }),
     snow: new THREE.MeshStandardMaterial({ color: 0xf7fbff, roughness: 0.7, metalness: 0, envMapIntensity: 0.75 }),
     eyeWhite: new THREE.MeshStandardMaterial({ color: 0xe8eef4, roughness: 0.25, metalness: 0 }),
-    iris: new THREE.MeshStandardMaterial({ color: 0x2c3a44, roughness: 0.15, metalness: 0.1, envMapIntensity: 1.4 }),
-    lip: new THREE.MeshStandardMaterial({ color: new THREE.Color(skinColor).lerp(new THREE.Color(0xa5564a), 0.55), roughness: 0.55 })
+    iris: new THREE.MeshStandardMaterial({ color: 0x3b4d59, roughness: 0.12, metalness: 0.1, envMapIntensity: 1.6 }),
+    pupil: new THREE.MeshStandardMaterial({ color: 0x05080b, roughness: 0.2, metalness: 0 }),
+    lip: new THREE.MeshStandardMaterial({ color: new THREE.Color(skinColor).lerp(new THREE.Color(0x7a332c), 0.82), roughness: 0.48 }),
+    lipDark: new THREE.MeshStandardMaterial({ color: 0x5c2a26, roughness: 0.55 })
   };
   matCache.set(idx, m);
   return m;
@@ -220,8 +269,8 @@ export function createCharacter(colorIdx) {
   hips.add(torsoGroup);
 
   const profile = [
-    [0.176, -0.06], [0.190, 0.02], [0.196, 0.12], [0.203, 0.24],
-    [0.222, 0.34], [0.238, 0.44], [0.232, 0.51], [0.196, 0.56], [0.130, 0.59]
+    [0.172, -0.06], [0.186, 0.02], [0.191, 0.12], [0.197, 0.24],
+    [0.212, 0.34], [0.226, 0.44], [0.221, 0.51], [0.190, 0.56], [0.128, 0.59]
   ].map(p => new THREE.Vector2(p[0], p[1]));
   const torsoGeo = new THREE.LatheGeometry(profile, 20);
   const torso = add(torsoGroup, torsoGeo, m.jacket, [0, 0, 0], null, [1, 1, 0.74]);
@@ -244,8 +293,6 @@ export function createCharacter(colorIdx) {
   // backpack + straps
   add(torsoGroup, new THREE.BoxGeometry(0.24, 0.28, 0.11), m.jacketDark, [0, 0.29, 0.165], [0.05, 0, 0]);
   add(torsoGroup, new THREE.BoxGeometry(0.20, 0.045, 0.10), m.leather, [0, 0.415, 0.17], [0.05, 0, 0]);
-  add(torsoGroup, new THREE.BoxGeometry(0.055, 0.30, 0.02), m.dark, [-0.095, 0.36, -0.155], [0, 0, 0.06]);
-  add(torsoGroup, new THREE.BoxGeometry(0.055, 0.30, 0.02), m.dark, [0.095, 0.36, -0.155], [0, 0, -0.06]);
   // shoulder straps of the pack
   add(torsoGroup, new THREE.BoxGeometry(0.045, 0.03, 0.22), m.dark, [-0.10, 0.50, 0.02]);
   add(torsoGroup, new THREE.BoxGeometry(0.045, 0.03, 0.22), m.dark, [0.10, 0.50, 0.02]);
@@ -263,51 +310,89 @@ export function createCharacter(colorIdx) {
   neck.castShadow = false;
 
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 0.735, -0.01);
+  headGroup.position.set(0, 0.742, -0.01);
+  headGroup.scale.setScalar(1.06);
   hips.add(headGroup);
 
   // skull + jaw
   add(headGroup, new THREE.SphereGeometry(0.107, 22, 18), m.skin, [0, 0.02, 0], null, [1.0, 1.10, 1.03]);
   add(headGroup, new THREE.SphereGeometry(0.090, 18, 14), m.skin, [0, -0.040, -0.030], null, [0.86, 0.80, 0.92]);
-  // ears
-  add(headGroup, new THREE.SphereGeometry(0.026, 10, 8), m.skin, [-0.106, 0.004, 0.002], null, [0.55, 1, 0.8]);
-  add(headGroup, new THREE.SphereGeometry(0.026, 10, 8), m.skin, [0.106, 0.004, 0.002], null, [0.55, 1, 0.8]);
-  // nose: bridge + tip standing proud of the face plane
-  add(headGroup, new THREE.BoxGeometry(0.020, 0.058, 0.030), m.skin, [0, 0.008, -0.098], [0.18, 0, 0]);
-  add(headGroup, new THREE.ConeGeometry(0.021, 0.055, 8), m.skin, [0, -0.010, -0.108], [-1.32, 0, 0]);
-  add(headGroup, new THREE.SphereGeometry(0.020, 10, 8), m.skin, [0, -0.030, -0.112], null, [1, 0.85, 0.9]);
-  // brows
-  add(headGroup, new THREE.BoxGeometry(0.046, 0.012, 0.014), m.hair, [-0.042, 0.058, -0.099], [0, 0.06, 0.14]);
-  add(headGroup, new THREE.BoxGeometry(0.046, 0.012, 0.014), m.hair, [0.042, 0.058, -0.099], [0, -0.06, -0.14]);
-  // eyes, sitting just proud of the skull so they read at range
+  // ears with a shaded inner shell
   for (const side of [-1, 1]) {
-    add(headGroup, new THREE.SphereGeometry(0.0175, 14, 12), m.eyeWhite, [side * 0.040, 0.020, -0.100], null, [1, 0.78, 0.45]);
-    add(headGroup, new THREE.SphereGeometry(0.0080, 10, 8), m.iris, [side * 0.040, 0.019, -0.109], null, [1, 1, 0.45]);
-    add(headGroup, new THREE.SphereGeometry(0.0032, 8, 6), m.snow, [side * 0.043, 0.023, -0.114], null, [1, 1, 0.5]);
-    // cold-flushed cheeks
-    add(headGroup, new THREE.SphereGeometry(0.030, 10, 8), m.skinRed, [side * 0.060, -0.028, -0.084], null, [1, 0.55, 0.28]);
+    add(headGroup, new THREE.SphereGeometry(0.028, 12, 10), m.skin, [side * 0.104, 0.004, 0.002], null, [0.5, 1.02, 0.78]);
+    add(headGroup, new THREE.SphereGeometry(0.015, 8, 6), m.skinShadow, [side * 0.110, 0.002, -0.006], null, [0.34, 0.72, 0.5]);
   }
-  // mouth
-  add(headGroup, new THREE.BoxGeometry(0.042, 0.011, 0.012), m.lip, [0, -0.070, -0.092], [0.12, 0, 0]);
+  // brow ridge and cheekbones break up the sphere of the skull
+  add(headGroup, new THREE.SphereGeometry(0.101, 18, 12), m.skin, [0, 0.030, -0.020], null, [1.0, 0.46, 0.96]);
+  for (const side of [-1, 1]) {
+    add(headGroup, new THREE.SphereGeometry(0.028, 12, 10), m.skin, [side * 0.058, -0.008, -0.066], null, [1, 0.62, 0.4]);
+  }
+  // jaw and chin
+  add(headGroup, new THREE.SphereGeometry(0.042, 14, 10), m.skin, [0, -0.066, -0.056], null, [0.96, 0.72, 0.68]);
+  // nose: soft bridge, rounded tip, alae and nostrils
+  add(headGroup, new THREE.CapsuleGeometry(0.0098, 0.036, 3, 8), m.skin, [0, 0.014, -0.0970], [-0.12, 0, 0], [1, 1, 0.8]);
+  add(headGroup, new THREE.SphereGeometry(0.0142, 12, 10), m.skin, [0, -0.0125, -0.1020], null, [1.02, 0.92, 1.0]);
+  for (const side of [-1, 1]) {
+    add(headGroup, new THREE.SphereGeometry(0.0102, 8, 6), m.skin, [side * 0.0155, -0.0195, -0.0995], null, [1, 0.8, 0.9]);
+    add(headGroup, new THREE.SphereGeometry(0.0046, 6, 5), m.skinShadow, [side * 0.0095, -0.0265, -0.1050], null, [1, 0.66, 0.5]);
+  }
+  // eyes: shallow sockets, open globes with irises, lids and a warm highlight
+  const lids = [];
+  for (const side of [-1, 1]) {
+    const ex = side * 0.041;
+    add(headGroup, new THREE.SphereGeometry(0.0215, 14, 12), m.skinShadow, [ex, 0.0198, -0.0900], null, [1.05, 0.8, 0.36]);
+    add(headGroup, new THREE.SphereGeometry(0.0150, 16, 14), m.eyeWhite, [ex, 0.0198, -0.0975], null, [1, 0.6, 0.52]);
+    add(headGroup, new THREE.SphereGeometry(0.0094, 14, 12), m.iris, [ex + side * 0.0014, 0.0188, -0.1068], null, [1, 1, 0.55]);
+    add(headGroup, new THREE.SphereGeometry(0.0042, 10, 8), m.pupil, [ex + side * 0.0014, 0.0186, -0.1096], null, [1, 1, 0.55]);
+    add(headGroup, new THREE.SphereGeometry(0.0026, 8, 6), m.eyeWhite, [ex + side * 0.0044, 0.0228, -0.1102], null, [1, 1, 0.6]);
+    // dark lash line dominates the upper edge so the eye reads almond-shaped
+    add(headGroup, new THREE.BoxGeometry(0.026, 0.0018, 0.005), m.skinShadow, [ex, 0.0262, -0.1012], [0, 0, side * 0.07]);
+    // upper lid with a hooded crease, lower lid and a soft lash line
+    const upperLid = add(headGroup, new THREE.SphereGeometry(0.0168, 14, 10), m.skin, [ex, 0.0286, -0.0950], [-0.24, 0, 0], [1.05, 0.56, 0.62]);
+    upperLid.userData.baseY = 0.56;
+    lids.push(upperLid);
+    const lowerLid = add(headGroup, new THREE.SphereGeometry(0.0158, 12, 8), m.skin, [ex, 0.0118, -0.0955], [0.24, 0, 0], [1.02, 0.32, 0.55]);
+    lowerLid.userData.baseY = 0.32;
+    lids.push(lowerLid);
+    add(headGroup, new THREE.BoxGeometry(0.029, 0.0018, 0.005), m.skinShadow, [ex, 0.0242, -0.1018], [0, 0, side * 0.06]);
+    // brows follow the ridge, thicker towards the nose
+    add(headGroup, new THREE.BoxGeometry(0.042, 0.0062, 0.010), m.hair, [ex, 0.0510, -0.0970], [0.06, side * 0.12, side * 0.12]);
+  }
+  // mouth: upper and lower lip with a soft, closed smile
+  add(headGroup, new THREE.CapsuleGeometry(0.0072, 0.028, 3, 8), m.lip, [0, -0.0625, -0.0935], [0, 0, Math.PI / 2], [1, 1, 0.85]);
+  add(headGroup, new THREE.CapsuleGeometry(0.0094, 0.024, 3, 8), m.lip, [0, -0.0748, -0.0915], [-0.06, 0, Math.PI / 2], [1, 1, 0.95]);
+  add(headGroup, new THREE.BoxGeometry(0.034, 0.0030, 0.006), m.lipDark, [0, -0.0682, -0.0940]);
+  for (const side of [-1, 1]) {
+    add(headGroup, new THREE.SphereGeometry(0.0042, 6, 5), m.lip, [side * 0.0175, -0.0685, -0.0910], null, [1, 0.9, 0.7]);
+  }
   // hair: a shell around the back and sides of the skull, open at the face
   add(headGroup, new THREE.SphereGeometry(0.111, 18, 14, 0, Math.PI, 0, Math.PI * 0.72), m.hair, [0, 0.02, 0], null, [1.0, 1.08, 1.03]);
   add(headGroup, new THREE.SphereGeometry(0.109, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.34), m.hair, [0, 0.045, 0], null, [1.0, 1.0, 1.02]);
+  // loose strands peeking out under the beanie
+  for (let i = 0; i < 5; i++) {
+    const t = (i - 2) / 2;
+    add(headGroup, new THREE.CapsuleGeometry(0.0095, 0.026, 3, 6), m.hair,
+      [t * 0.048, 0.0655 - Math.abs(t) * 0.005, -0.0935], [0.42, 0, t * 0.5], [1, 1, 0.62]);
+  }
 
   // beanie, worn above the brow line
-  add(headGroup, new THREE.SphereGeometry(0.116, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.56), m.beanie, [0, 0.070, 0], null, [1.02, 1.06, 1.03]);
-  add(headGroup, new THREE.CylinderGeometry(0.118, 0.118, 0.055, 20, 1, true), m.beanie, [0, 0.080, 0], null, [1.02, 1, 1.03]);
+  add(headGroup, new THREE.SphereGeometry(0.114, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.56), m.beanie, [0, 0.086, 0], null, [1.02, 1.02, 1.03]);
+  add(headGroup, new THREE.CylinderGeometry(0.112, 0.114, 0.048, 20, 1, true), m.beanie, [0, 0.088, 0], null, [1.02, 1, 1.03]);
   add(headGroup, new THREE.SphereGeometry(0.030, 12, 10), m.snow, [0, 0.198, 0], null, [1, 0.85, 1]);
   add(headGroup, new THREE.SphereGeometry(0.018, 8, 6), m.beanie, [0.03, 0.184, -0.01]);
-  // goggles pushed up on the hat
-  add(headGroup, new THREE.TorusGeometry(0.118, 0.011, 8, 24), m.dark, [0, 0.100, 0], [Math.PI / 2, 0, 0], [1.02, 1, 1.03]);
-  add(headGroup, new THREE.BoxGeometry(0.105, 0.046, 0.028), m.dark, [0, 0.122, -0.092], [-0.32, 0, 0]);
-  add(headGroup, new THREE.BoxGeometry(0.088, 0.032, 0.010), m.lens, [0, 0.124, -0.106], [-0.32, 0, 0]);
+  // goggles pushed up on the hat: strap, frame and two round lenses
+  add(headGroup, new THREE.TorusGeometry(0.1165, 0.0075, 8, 26), m.dark, [0, 0.100, 0], [Math.PI / 2, 0, 0], [1.02, 1, 1.03]);
+  add(headGroup, new THREE.BoxGeometry(0.098, 0.036, 0.020), m.dark, [0, 0.1135, -0.0905], [-0.34, 0, 0]);
+  for (const side of [-1, 1]) {
+    add(headGroup, new THREE.CylinderGeometry(0.0295, 0.0295, 0.014, 18), m.lens, [side * 0.0295, 0.117, -0.1005], [Math.PI / 2 - 0.34, 0, 0], [1, 1, 0.9]);
+    add(headGroup, new THREE.TorusGeometry(0.0295, 0.0048, 8, 18), m.dark, [side * 0.0295, 0.117, -0.1015], [Math.PI / 2 - 0.34, 0, 0]);
+  }
   // frost on the brows
   add(headGroup, new THREE.SphereGeometry(0.016, 8, 6), m.snow, [-0.052, 0.072, -0.100], null, [1.4, 0.35, 0.35]);
   add(headGroup, new THREE.SphereGeometry(0.012, 8, 6), m.snow, [0.050, 0.074, -0.100], null, [1.4, 0.35, 0.35]);
 
   // ---- scarf ------------------------------------------------------------
-  add(headGroup, new THREE.TorusGeometry(0.098, 0.042, 10, 20), m.scarf, [0, -0.108, 0], [Math.PI / 2, 0, 0], [1, 1, 0.85]);
+  add(headGroup, new THREE.TorusGeometry(0.096, 0.036, 10, 20), m.scarf, [0, -0.118, 0], [Math.PI / 2, 0, 0], [1, 1, 0.85]);
   const scarfTail = new THREE.Group();
   scarfTail.position.set(0.055, -0.135, -0.035);
   headGroup.add(scarfTail);
@@ -318,30 +403,32 @@ export function createCharacter(colorIdx) {
   // ---- arms -------------------------------------------------------------
   function makeArm(side) {
     const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.228, 0.500, 0);
+    shoulder.position.set(side * 0.208, 0.502, 0);
     shoulder.rotation.z = side * 0.06;
     torsoGroup.add(shoulder);
 
     // shoulder pad
-    add(shoulder, new THREE.SphereGeometry(0.079, 14, 10), m.jacket, [side * 0.004, -0.020, 0], null, [1.02, 0.92, 0.96]);
+    add(shoulder, new THREE.SphereGeometry(0.062, 16, 12), m.jacket, [side * 0.003, -0.018, 0], null, [1.02, 0.94, 0.96]);
     // upper arm
-    add(shoulder, new THREE.CapsuleGeometry(0.067, 0.175, 4, 12), m.jacket, [0, -0.155, 0], null, [1, 1, 0.96]);
+    add(shoulder, new THREE.CapsuleGeometry(0.059, 0.178, 4, 14), m.jacket, [0, -0.155, 0], null, [1, 1, 0.96]);
 
     const elbow = new THREE.Group();
     elbow.position.y = -0.30;
     shoulder.add(elbow);
-    add(elbow, new THREE.CapsuleGeometry(0.060, 0.165, 4, 12), m.jacket, [0, -0.135, 0], null, [1, 1, 0.94]);
+    add(elbow, new THREE.CapsuleGeometry(0.052, 0.168, 4, 14), m.jacket, [0, -0.135, 0], null, [1, 1, 0.94]);
     // knit cuff
-    add(elbow, new THREE.CylinderGeometry(0.058, 0.063, 0.055, 12), m.scarf, [0, -0.245, 0]);
+    add(elbow, new THREE.CylinderGeometry(0.050, 0.055, 0.052, 14), m.scarf, [0, -0.245, 0]);
     // glove
     const hand = new THREE.Group();
     hand.position.y = -0.285;
     elbow.add(hand);
-    add(hand, new THREE.BoxGeometry(0.070, 0.095, 0.055), m.leather, [0, -0.035, -0.004], [0.1, 0, 0]);
-    add(hand, new THREE.BoxGeometry(0.062, 0.045, 0.048), m.leather, [0, 0.012, 0]);
+    add(hand, new THREE.CapsuleGeometry(0.030, 0.055, 4, 12), m.leather, [0, -0.035, -0.004], [0.1, 0, 0], [1.12, 1, 0.85]);
+    add(hand, new THREE.SphereGeometry(0.032, 12, 10), m.leather, [0, 0.012, 0], null, [1.05, 0.8, 0.95]);
     for (let f = 0; f < 4; f++) {
-      add(hand, new THREE.CapsuleGeometry(0.0115, 0.032, 3, 8), m.leather,
-        [-0.024 + f * 0.016, -0.083, -0.012], [0.45, 0, 0]);
+      add(hand, new THREE.CapsuleGeometry(0.0105, 0.020, 3, 8), m.leather,
+        [-0.023 + f * 0.0155, -0.078, -0.012], [0.45, 0, 0]);
+      add(hand, new THREE.CapsuleGeometry(0.0085, 0.014, 3, 6), m.leather,
+        [-0.023 + f * 0.0155, -0.095, -0.020], [0.9, 0, 0]);
     }
     add(hand, new THREE.CapsuleGeometry(0.014, 0.030, 3, 8), m.leather, [side * -0.040, -0.045, -0.018], [0.3, 0, side * 0.7]);
     return { shoulder, elbow, hand };
@@ -393,6 +480,8 @@ export function createCharacter(colorIdx) {
     root, colorIdx,
     phase: Math.random() * 10,
     time: Math.random() * 20,
+    blinkT: 1.2 + Math.random() * 4,
+    blinkPhase: 0,
     throwT: 0,
     deadProgress: 0,
     deadSide: Math.random() < 0.5 ? -1 : 1,
@@ -408,6 +497,18 @@ export function createCharacter(colorIdx) {
   function update(dt, opts) {
     const { yaw = 0, pitch = 0, moving = false, sprinting = false, dead = false } = opts || {};
     state.time += dt;
+
+    // occasional blink keeps the face alive instead of staring
+    if (!dead) {
+      state.blinkT -= dt;
+      if (state.blinkT <= 0) { state.blinkT = 2.2 + Math.random() * 4.8; state.blinkPhase = 0.0001; }
+      if (state.blinkPhase > 0) {
+        state.blinkPhase += dt / 0.15;
+        const k = Math.sin(Math.min(1, state.blinkPhase) * Math.PI);
+        for (const l of lids) l.scale.y = l.userData.baseY * (1 - k * 0.9);
+        if (state.blinkPhase >= 1) state.blinkPhase = 0;
+      }
+    }
     root.rotation.y = yaw;
     headGroup.rotation.x = Math.max(-0.5, Math.min(0.5, pitch * 0.6));
 
@@ -616,17 +717,28 @@ export function createViewModel() {
   hand.position.set(-0.052, 0.055, -0.235);
   armPivot.add(hand);
 
-  const palm = add(hand, new THREE.CapsuleGeometry(0.062, 0.085, 4, 12), glove, [0, 0, -0.02], [-1.22, 0.10, 0.16]);
+  const palm = add(hand, new THREE.CapsuleGeometry(0.060, 0.082, 4, 14), glove, [0, 0, -0.02], [-1.22, 0.10, 0.16]);
   palm.castShadow = false;
-  add(hand, new THREE.SphereGeometry(0.058, 12, 10), glove, [0.006, 0.026, -0.058], null, [1.05, 0.7, 0.95]);
-  const thumb = add(hand, new THREE.CapsuleGeometry(0.028, 0.055, 4, 8), glove,
-    [-0.078, 0.012, -0.028], [0.35, 0, 0.75]);
+  add(hand, new THREE.SphereGeometry(0.056, 14, 12), glove, [0.006, 0.026, -0.058], null, [1.05, 0.68, 0.95]);
+  // knuckle ridge + tendon bumps so the glove reads as a real hand
+  for (let i = 0; i < 4; i++) {
+    add(hand, new THREE.SphereGeometry(0.0135, 8, 6), glove, [0.040 - i * 0.024, 0.030, -0.086], null, [1.1, 0.85, 1]);
+  }
+  const thumb = add(hand, new THREE.CapsuleGeometry(0.026, 0.050, 4, 10), glove,
+    [-0.074, 0.014, -0.030], [0.35, 0, 0.75]);
   thumb.castShadow = false;
-  // fingers wrap around the ball
+  add(hand, new THREE.CapsuleGeometry(0.021, 0.026, 3, 8), glove, [-0.090, 0.036, -0.054], [0.9, 0.2, 0.6]);
+  // fingers wrap around the ball: two phalanges each with a rounded pad
   const fingers = [];
   for (let i = 0; i < 4; i++) {
-    fingers.push(add(hand, new THREE.CapsuleGeometry(0.019, 0.050, 3, 8), glove,
-      [0.044 - i * 0.004, -0.028 - i * 0.004, -0.070 + i * 0.008], [1.15, 0, 0.12]));
+    const g = new THREE.Group();
+    g.position.set(0.042 - i * 0.024, -0.020 - i * 0.003, -0.076 + i * 0.007);
+    g.rotation.set(1.15, 0, 0.10);
+    hand.add(g);
+    add(g, new THREE.CapsuleGeometry(0.0165, 0.032, 3, 8), glove, [0, -0.026, 0]);
+    add(g, new THREE.CapsuleGeometry(0.0145, 0.022, 3, 8), glove, [0, -0.060, 0.010], [0.55, 0, 0]);
+    add(g, new THREE.SphereGeometry(0.0135, 8, 6), glove, [0, -0.076, 0.016], null, [1, 0.9, 1]);
+    fingers.push(g);
   }
 
   // snowball with clumps
@@ -648,8 +760,9 @@ export function createViewModel() {
   left.position.set(-0.60, -0.62, -0.88);
   left.rotation.set(-0.42, 0.55, -0.30);
   group.add(left);
-  const lPalm = add(left, new THREE.BoxGeometry(0.140, 0.088, 0.175), glove, [0, 0, 0]);
+  const lPalm = add(left, new THREE.CapsuleGeometry(0.056, 0.062, 4, 14), glove, [0, 0, 0], [0, 0, Math.PI / 2], [1, 1, 0.78]);
   lPalm.castShadow = false;
+  add(left, new THREE.SphereGeometry(0.050, 12, 10), glove, [0, -0.006, -0.038], null, [1.1, 0.72, 1]);
   for (let i = 0; i < 4; i++) {
     add(left, new THREE.CapsuleGeometry(0.017, 0.045, 3, 8), glove,
       [-0.045 + i * 0.030, -0.012, -0.105], [0.55, 0, 0]);

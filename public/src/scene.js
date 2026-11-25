@@ -295,6 +295,16 @@ export function createWorld(renderer, quality = 'high') {
   sky.frustumCulled = false;
   scene.add(sky);
 
+  // Sun disc + halo: gives the low winter light a real, blinding source
+  const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeSoftDisc(false), color: 0xffe7bd, transparent: true, opacity: 0.62,
+    depthWrite: false, blending: THREE.AdditiveBlending, fog: false
+  }));
+  sunGlow.position.copy(SUN_DIR).multiplyScalar(560);
+  sunGlow.scale.set(46, 46, 1);
+  sunGlow.renderOrder = 1;
+  scene.add(sunGlow);
+
   // Environment reflections from the sky
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene();
@@ -314,8 +324,8 @@ export function createWorld(renderer, quality = 'high') {
   sun.shadow.camera.left = -38; sun.shadow.camera.right = 38;
   sun.shadow.camera.top = 38; sun.shadow.camera.bottom = -38;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 260;
-  sun.shadow.bias = -0.00035;
-  sun.shadow.normalBias = 0.075;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.14;
   scene.add(sun);
   scene.add(sun.target);
 
@@ -347,7 +357,7 @@ export function createWorld(renderer, quality = 'high') {
     const pd = Math.hypot(x - POND.x, z - POND.z);
     const pondT = 1 - smoothstep(POND.r * 0.85, POND.r * 1.45, pd);
     const n = fbm(x * 0.18, z * 0.18, 3);
-    const shade = 0.80 + n * 0.14 - Math.min(0.10, Math.max(0, -y) * 0.014);
+    const shade = 0.87 + n * 0.075 - Math.min(0.09, Math.max(0, -y) * 0.012);
     let r = shade * 0.945, g = shade * 0.975, b = shade * 1.02;
     // wind-packed, slightly blue shading in hollows
     if (n < 0.35) { r *= 0.965; g *= 0.975; b *= 0.995; }
@@ -367,8 +377,8 @@ export function createWorld(renderer, quality = 'high') {
     color: 0xffffff,
     map: snowColor,
     normalMap: snowNormal,
-    normalScale: new THREE.Vector2(0.5, 0.5),
-    roughness: 0.88,
+    normalScale: new THREE.Vector2(0.85, 0.85),
+    roughness: 0.84,
     metalness: 0.0,
     vertexColors: true,
     envMapIntensity: 0.28
@@ -445,8 +455,8 @@ export function createWorld(renderer, quality = 'high') {
     trees.push({ x, z, h: 7.2 + Math.pow(rnd(), 1.35) * 12.5, r: 0.78 + rnd() * 0.52, seed: rnd() * 100 });
   }
 
-  const layers = q === 0 ? 6 : q === 1 ? 8 : 9;
-  const radial = q === 0 ? 8 : 12;
+  const layers = q === 0 ? 7 : q === 1 ? 9 : 11;
+  const radial = q === 0 ? 9 : 14;
   const foliageGeo = new THREE.ConeGeometry(1, 1, radial, 1);
   foliageGeo.translate(0, 0.5, 0);
   const foliageMat = new THREE.MeshStandardMaterial({
@@ -857,21 +867,23 @@ export function createWorld(renderer, quality = 'high') {
     return geo;
   }
 
+  const mtSeg = q === 0 ? 12 : q === 1 ? 22 : 32;
+  const mtRings = q === 0 ? 5 : q === 1 ? 10 : 15;
   for (let i = 0; i < 18; i++) {
     const a = (i / 18) * Math.PI * 2 + mr() * 0.25;
     const r = 300 + mr() * 150;
     const h = 90 + mr() * 170;
     const rad = 90 + mr() * 130;
     const seed = mr() * 60;
-    const mtGeo = craggy(new THREE.ConeGeometry(rad, h, 16, 6), h, seed);
+    const mtGeo = craggy(new THREE.ConeGeometry(rad, h, mtSeg, mtRings), h, seed);
     const mt = new THREE.Mesh(mtGeo, mtMat);
     mt.position.set(Math.cos(a) * r, h / 2 - 40, Math.sin(a) * r);
     mt.rotation.y = mr() * Math.PI;
     mountains.add(mt);
 
-    const capGeo = craggy(new THREE.ConeGeometry(rad * 0.47, h * 0.42, 16, 3), h * 0.42, seed + 9);
+    const capGeo = craggy(new THREE.ConeGeometry(rad * 0.43, h * 0.4, mtSeg, Math.max(3, Math.round(mtRings * 0.6))), h * 0.4, seed + 9);
     const cap = new THREE.Mesh(capGeo, mtSnow);
-    cap.position.set(mt.position.x, mt.position.y + h * 0.29, mt.position.z);
+    cap.position.set(mt.position.x, mt.position.y + h * 0.30, mt.position.z);
     cap.rotation.y = mt.rotation.y;
     mountains.add(cap);
   }

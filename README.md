@@ -15,7 +15,7 @@ läuft auf jedem Static-Host (Vercel, GitHub Pages, Netlify …).
 |---|---|
 | **Ziel** | 15 Eliminierungen pro Runde |
 | **Treffer** | Ein Körpertreffer schaltet den Gegner aus |
-| **Wurf** | Linksklick halten lädt die Wucht auf, loslassen wirft |
+| **Wurf** | Linksklick halten lädt die Wucht auf, loslassen wirft – währenddessen friert die Welt ein (Zeitlupe) |
 | **Respawn** | Automatisch nach 3,2 Sekunden |
 | **Karte** | Hügel, dichter Fichtenwald, Holzhütte, gefrorener See |
 | **Bots** | 0–5 KI-Gegner (Frost, Yeti, Eiswolf) füllen den Raum |
@@ -28,7 +28,7 @@ läuft auf jedem Static-Host (Vercel, GitHub Pages, Netlify …).
 | `Shift` | Sprinten |
 | `Space` | Springen |
 | `Maus` | Zielen |
-| `Linke Maustaste` | Schneeball aufladen & werfen |
+| `Linke Maustaste` | Schneeball aufladen (Welt friert ein) & werfen |
 | `Tab` | Rangliste |
 | `M` | Ton an/aus |
 | `F` | FPS-Anzeige (mit Render-Skalierung) |
