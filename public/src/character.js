@@ -677,6 +677,11 @@ function materialsFor(idx) {
       roughness: 0.85, metalness: 0
     }),
     hair: new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0 }),
+    mitten: new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(0x6b4a33), roughness: 0.78, metalness: 0,
+      normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.5, 0.5),
+      sheen: 0.4, sheenRoughness: 0.7, sheenColor: new THREE.Color(0xb08a68), envMapIntensity: 0.5
+    }),
     leather: new THREE.MeshPhysicalMaterial({
       color: 0x1d2126, roughness: 0.58, metalness: 0.04,
       normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.7, 0.7),
@@ -719,6 +724,142 @@ function add(parent, geo, material, pos, rot, scale) {
 }
 
 // ---------------------------------------------------------------------------
+// Body construction
+// A body assembled from capsules always shows its seams. These two builders
+// give one continuous surface instead: a lofted shell for the jacket and
+// skinned tubes for the limbs, so an elbow folds the cloth rather than pulling
+// two caps apart at a joint ball.
+// ---------------------------------------------------------------------------
+function loftGeometry(sections, radial = 30) {
+  const pos = [], uvs = [], idx = [];
+  const rows = sections.length;
+  for (let i = 0; i < rows; i++) {
+    const [y, rx, rz] = sections[i];
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      pos.push(Math.cos(a) * rx, y, Math.sin(a) * rz);
+      uvs.push(j / radial, i / (rows - 1));
+    }
+  }
+  for (let i = 0; i < rows - 1; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * (radial + 1) + j, b = a + radial + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  // flat end caps so the shell is watertight from any angle
+  const capLo = pos.length / 3;
+  pos.push(0, sections[0][0], 0); uvs.push(0.5, 0);
+  const capHi = capLo + 1;
+  pos.push(0, sections[rows - 1][0], 0); uvs.push(0.5, 1);
+  const ringLo = 0, ringHi = (rows - 1) * (radial + 1);
+  for (let j = 0; j < radial; j++) {
+    idx.push(capLo, ringLo + j + 1, ringLo + j);
+    idx.push(capHi, ringHi + j, ringHi + j + 1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+// A loft whose rings can drift sideways: used for boots, where the shaft is
+// vertical but the foot has to curve forward.
+function ringLoft(rings, radial = 20) {
+  const pos = [], uvs = [], idx = [];
+  for (let i = 0; i < rings.length; i++) {
+    const [y, cz, rx, rz] = rings[i];
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      pos.push(Math.cos(a) * rx, y, cz + Math.sin(a) * rz);
+      uvs.push(j / radial, i / (rings.length - 1));
+    }
+  }
+  for (let i = 0; i < rings.length - 1; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * (radial + 1) + j, b = a + radial + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const capLo = pos.length / 3;
+  pos.push(0, rings[0][0], rings[0][1]); uvs.push(0.5, 0);
+  const capHi = capLo + 1;
+  pos.push(0, rings[rings.length - 1][0], rings[rings.length - 1][1]); uvs.push(0.5, 1);
+  const ringLo = 0, ringHi = (rings.length - 1) * (radial + 1);
+  for (let j = 0; j < radial; j++) {
+    idx.push(capLo, ringLo + j + 1, ringLo + j);
+    idx.push(capHi, ringHi + j, ringHi + j + 1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+// A limb as one tube with a taper, weighted to two bones. The weight ramps
+// across the joint so the surface bends smoothly instead of hinging.
+function limbGeometry(baseX, baseY, baseZ, upperLen, lowerLen, radiusAt, opts = {}) {
+  const rings = opts.rings || 26;
+  const radial = opts.radial || 16;
+  const blend = opts.blend || 0.05;
+  const total = upperLen + lowerLen;
+  const pos = [], uvs = [], idx = [], si = [], sw = [];
+  for (let i = 0; i <= rings; i++) {
+    const t = i / rings;
+    const d = total * t;
+    const r = radiusAt(t);
+    let w = (d - (upperLen - blend)) / (blend * 2);
+    w = Math.max(0, Math.min(1, w));
+    w = w * w * (3 - 2 * w);
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      pos.push(baseX + Math.cos(a) * r, baseY - d, baseZ + Math.sin(a) * r);
+      uvs.push(j / radial, t);
+      si.push(0, 1, 0, 0);
+      sw.push(1 - w, w, 0, 0);
+    }
+  }
+  for (let i = 0; i < rings; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * (radial + 1) + j, b = a + radial + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+const armRadius = (t) => {
+  if (t < 0.05) return 0.030 + t / 0.05 * 0.042;   // cap tucked inside the body
+  if (t < 0.20) return 0.072 - (t - 0.05) * 0.02;
+  if (t < 0.50) return 0.069 - (t - 0.20) * 0.035;
+  if (t < 0.56) return 0.059 - (t - 0.50) * 0.01;
+  if (t < 0.95) return 0.058 - (t - 0.56) * 0.018;
+  return 0.051 - (t - 0.95) / 0.05 * 0.024;
+};
+const legRadius = (t) => {
+  if (t < 0.06) return 0.045 + t / 0.06 * 0.060;
+  if (t < 0.22) return 0.105 - (t - 0.06) * 0.03;
+  if (t < 0.50) return 0.100 - (t - 0.22) * 0.045;
+  if (t < 0.58) return 0.0874 - (t - 0.50) * 0.02;
+  if (t < 0.94) return 0.0858 - (t - 0.58) * 0.045;
+  return 0.0696 - (t - 0.94) / 0.06 * 0.030;
+};
+
+// ---------------------------------------------------------------------------
 // Character
 // ---------------------------------------------------------------------------
 export function createCharacter(colorIdx) {
@@ -731,40 +872,36 @@ export function createCharacter(colorIdx) {
   hips.position.y = 0.92;
   root.add(hips);
 
-  // ---- pelvis / trousers -----------------------------------------------
-  add(hips, new THREE.CapsuleGeometry(0.145, 0.12, 4, 14), m.pants, [0, 0.01, 0], null, [1.12, 1, 0.82]);
-  add(hips, new THREE.BoxGeometry(0.30, 0.07, 0.20), m.leather, [0, 0.10, 0.01]);
-
-  // ---- torso: jacket shell with a tailored silhouette -------------------
+  // ---- body: one lofted jacket shell ------------------------------------
+  // Hem, waist, chest, shoulders and collar are cross sections of a single
+  // surface, so the silhouette is continuous from the hips to the neck.
   const torsoGroup = new THREE.Group();
   torsoGroup.position.y = 0.02;
   hips.add(torsoGroup);
 
-  const profile = [
-    [0.172, -0.06], [0.186, 0.02], [0.191, 0.12], [0.197, 0.24],
-    [0.212, 0.34], [0.226, 0.44], [0.221, 0.51], [0.190, 0.56], [0.128, 0.59]
-  ].map(p => new THREE.Vector2(p[0], p[1]));
-  const torsoGeo = new THREE.LatheGeometry(profile, 20);
-  const torso = add(torsoGroup, torsoGeo, m.jacket, [0, 0, 0], null, [1, 1, 0.74]);
+  const jacketSections = [
+    [-0.074, 0.176, 0.120], [-0.030, 0.178, 0.122], [0.040, 0.172, 0.122],
+    [0.120, 0.166, 0.118], [0.200, 0.168, 0.120], [0.280, 0.176, 0.126],
+    [0.350, 0.190, 0.134], [0.420, 0.206, 0.142], [0.470, 0.216, 0.146],
+    [0.505, 0.214, 0.141], [0.535, 0.196, 0.132], [0.560, 0.160, 0.120],
+    [0.582, 0.118, 0.106], [0.600, 0.100, 0.098]
+  ];
+  const torso = add(torsoGroup, loftGeometry(jacketSections, 32), m.jacket, [0, 0, 0]);
   torso.castShadow = true;
 
-  // quilted chest panels
-  add(torsoGroup, new THREE.BoxGeometry(0.155, 0.20, 0.03), m.jacketDark, [-0.085, 0.31, -0.155], [0.03, 0, -0.04]);
-  add(torsoGroup, new THREE.BoxGeometry(0.155, 0.20, 0.03), m.jacketDark, [0.085, 0.31, -0.155], [0.03, 0, 0.04]);
+  // waist band follows the same ellipse as the shell
+  const belt = add(torsoGroup, new THREE.CylinderGeometry(1, 1, 1, 28, 1, true), m.leather, [0, 0.078, 0], null, [0.171, 0.05, 0.123]);
+  belt.castShadow = false;
+
   // zip
   add(torsoGroup, new THREE.BoxGeometry(0.012, 0.52, 0.012), m.metal, [0, 0.30, -0.163]);
   add(torsoGroup, new THREE.BoxGeometry(0.022, 0.028, 0.014), m.metal, [0, 0.44, -0.172]);
-  // hem band + waist drawcord
-  add(torsoGroup, new THREE.CylinderGeometry(0.182, 0.178, 0.05, 18, 1, true), m.jacketDark, [0, -0.03, 0], null, [1, 1, 0.78]);
-  add(torsoGroup, new THREE.CylinderGeometry(0.186, 0.186, 0.018, 18), m.dark, [0, 0.02, 0], null, [1, 1, 0.78]);
-  // collar
-  add(torsoGroup, new THREE.CylinderGeometry(0.108, 0.122, 0.075, 16, 1, true), m.jacketDark, [0, 0.575, 0], null, [1, 1, 0.9]);
-  // hood bunched behind the neck
-  const hood = add(torsoGroup, new THREE.SphereGeometry(0.165, 16, 12), m.jacket, [0, 0.545, 0.115], [0.25, 0, 0], [1.05, 0.86, 0.72]);
+  // hood bunched behind the neck: flat, wide, sitting on the shoulders
+  const hood = add(torsoGroup, new THREE.SphereGeometry(1, 18, 12), m.jacket, [0, 0.512, 0.108], [0.22, 0, 0], [0.155, 0.085, 0.105]);
   hood.receiveShadow = true;
-  // backpack + straps
-  add(torsoGroup, new THREE.BoxGeometry(0.24, 0.28, 0.11), m.jacketDark, [0, 0.29, 0.165], [0.05, 0, 0]);
-  add(torsoGroup, new THREE.BoxGeometry(0.20, 0.045, 0.10), m.leather, [0, 0.415, 0.17], [0.05, 0, 0]);
+  // backpack: smaller, pressed against the back
+  add(torsoGroup, new THREE.BoxGeometry(0.205, 0.245, 0.085), m.jacketDark, [0, 0.285, 0.185], [0.04, 0, 0]);
+  add(torsoGroup, new THREE.BoxGeometry(0.175, 0.04, 0.078), m.leather, [0, 0.398, 0.188], [0.04, 0, 0]);
   // shoulder straps of the pack
   add(torsoGroup, new THREE.BoxGeometry(0.045, 0.03, 0.22), m.dark, [-0.10, 0.50, 0.02]);
   add(torsoGroup, new THREE.BoxGeometry(0.045, 0.03, 0.22), m.dark, [0.10, 0.50, 0.02]);
@@ -784,7 +921,8 @@ export function createCharacter(colorIdx) {
   neck.castShadow = false;
 
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 0.760, -0.008);
+  headGroup.position.set(0, 0.752, -0.008);
+  headGroup.scale.setScalar(1.14);      // 6.4 heads tall: reads as a stylised kid
   hips.add(headGroup);
 
   const headMesh = add(headGroup, headGeometry(), m.face, [0, 0, 0]);
@@ -848,11 +986,15 @@ export function createCharacter(colorIdx) {
   }
 
   // ---- scarf ------------------------------------------------------------
-  add(headGroup, new THREE.TorusGeometry(0.072, 0.020, 10, 28), m.scarf, [0, -0.126, 0],
+  // lives on the neck, not on the head, so scaling the head leaves it alone
+  const scarfGroup = new THREE.Group();
+  scarfGroup.position.set(0, 0.752, -0.008);
+  hips.add(scarfGroup);
+  add(scarfGroup, new THREE.TorusGeometry(0.078, 0.022, 10, 28), m.scarf, [0, -0.150, 0],
     [Math.PI / 2, 0, 0], [1.04, 0.86, 0.94]);
   const scarfTail = new THREE.Group();
-  scarfTail.position.set(0.052, -0.148, -0.036);
-  headGroup.add(scarfTail);
+  scarfTail.position.set(0.054, -0.162, -0.036);
+  scarfGroup.add(scarfTail);
   add(scarfTail, new THREE.BoxGeometry(0.082, 0.19, 0.034), m.scarf, [0.01, -0.095, 0], [0.06, 0, 0.10]);
   add(scarfTail, new THREE.BoxGeometry(0.074, 0.15, 0.030), m.scarf, [0.028, -0.245, 0.012], [0.02, 0.1, 0.18]);
   add(scarfTail, new THREE.BoxGeometry(0.058, 0.028, 0.028), m.scarf, [0.042, -0.325, 0.020], [0, 0.1, 0.2]);
@@ -860,32 +1002,51 @@ export function createCharacter(colorIdx) {
   // ---- arms -------------------------------------------------------------
   function makeArm(side) {
     const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.208, 0.502, 0);
+    shoulder.position.set(side * 0.179, 0.494, 0);
     shoulder.rotation.z = side * 0.06;
     torsoGroup.add(shoulder);
 
-    // shoulder pad
-    add(shoulder, new THREE.SphereGeometry(0.058, 16, 12), m.jacket, [side * 0.002, -0.024, 0], null, [1.04, 0.88, 0.96]);
-    // upper arm
-    add(shoulder, new THREE.CapsuleGeometry(0.059, 0.178, 4, 14), m.jacket, [0, -0.155, 0], null, [1, 1, 0.96]);
+    // upper sleeve: starts wide inside the shoulder and tapers into the elbow
+    const upperGeo = limbGeometry(0, 0, 0, 0.325, 0, (t) => {
+      if (t < 0.12) return 0.058 + t * 0.075;
+      if (t < 0.50) return 0.0670 - (t - 0.12) * 0.020;
+      if (t < 0.90) return 0.0594 - (t - 0.50) * 0.022;
+      return 0.0506 - (t - 0.90) * 0.120;
+    }, { rings: 18, radial: 18 });
+    const upper = new THREE.Mesh(upperGeo, m.jacket);
+    upper.castShadow = true; upper.receiveShadow = true;
+    shoulder.add(upper);
+    // shoulder of the jacket: a soft cap that carries the sleeve into the body
+    const deltoid = add(shoulder, new THREE.SphereGeometry(1, 18, 14), m.jacket,
+      [side * -0.004, -0.004, 0], [0, 0, side * 0.18], [0.066, 0.072, 0.068]);
 
     const elbow = new THREE.Group();
     elbow.position.y = -0.30;
     shoulder.add(elbow);
-    add(elbow, new THREE.SphereGeometry(0.053, 12, 10), m.jacket, [0, 0, 0], null, [1, 1, 0.96]);
-    add(elbow, new THREE.CapsuleGeometry(0.052, 0.168, 4, 14), m.jacket, [0, -0.135, 0], null, [1, 1, 0.94]);
+    // forearm starts slightly wider than the upper sleeve ends, hiding the seam
+    const foreGeo = limbGeometry(0, 0, 0, 0.30, 0, (t) => {
+      if (t < 0.06) return 0.0570 - t * 0.14;
+      if (t < 0.55) return 0.0486 + (t - 0.06) * 0.005;
+      if (t < 0.92) return 0.0510 - (t - 0.55) * 0.016;
+      return 0.0451 - (t - 0.92) * 0.22;
+    }, { rings: 18, radial: 18 });
+    const fore = new THREE.Mesh(foreGeo, m.jacket);
+    fore.castShadow = true; fore.receiveShadow = true;
+    elbow.add(fore);
+    // a stitched crease reads as folded fabric instead of a joint
+    add(elbow, new THREE.TorusGeometry(0.0555, 0.006, 6, 18), m.jacketDark, [0, 0.012, 0], [Math.PI / 2, 0, 0]);
     // knit cuff
     add(elbow, new THREE.CylinderGeometry(0.050, 0.055, 0.052, 14), m.scarf, [0, -0.245, 0]);
     // mitten: one soft palm, a thumb and a knit cuff — cleaner than four fingers
     const hand = new THREE.Group();
     hand.position.y = -0.285;
     elbow.add(hand);
-    add(hand, new THREE.CylinderGeometry(0.040, 0.045, 0.032, 16), m.scarf, [0, 0.004, 0]);
-    add(hand, new THREE.SphereGeometry(1, 16, 12), m.leather, [0, -0.048, -0.006], [0.06, 0, 0], [0.046, 0.062, 0.036]);
-    add(hand, new THREE.SphereGeometry(1, 12, 10), m.leather, [0, -0.098, -0.004], null, [0.030, 0.020, 0.030]);
-    add(hand, new THREE.CapsuleGeometry(0.0145, 0.030, 4, 10), m.leather,
-      [side * -0.038, -0.052, -0.018], [0.25, 0, side * 0.95]);
-    add(hand, new THREE.SphereGeometry(1, 8, 6), m.snow, [0, 0.016, -0.020], null, [0.032, 0.010, 0.020]);
+    add(hand, new THREE.CylinderGeometry(0.043, 0.048, 0.034, 18), m.scarf, [0, 0.006, 0]);
+    add(hand, new THREE.SphereGeometry(1, 18, 14), m.mitten, [0, -0.055, -0.008], [0.08, 0, 0], [0.055, 0.074, 0.043]);
+    add(hand, new THREE.SphereGeometry(1, 12, 10), m.mitten, [0, -0.116, -0.006], null, [0.036, 0.024, 0.036]);
+    add(hand, new THREE.CapsuleGeometry(0.0170, 0.034, 4, 10), m.mitten,
+      [side * -0.044, -0.060, -0.020], [0.25, 0, side * 0.95]);
+    add(hand, new THREE.SphereGeometry(1, 8, 6), m.snow, [0, 0.018, -0.024], null, [0.034, 0.010, 0.022]);
     return { shoulder, elbow, hand };
   }
   const armR = makeArm(1);
@@ -894,29 +1055,55 @@ export function createCharacter(colorIdx) {
   // ---- legs -------------------------------------------------------------
   function makeLeg(side) {
     const hip = new THREE.Group();
-    hip.position.set(side * 0.098, -0.015, 0);
+    hip.position.set(side * 0.088, -0.015, 0);
     hips.add(hip);
-    add(hip, new THREE.SphereGeometry(0.095, 14, 11), m.pants, [0, 0, 0], null, [1, 1, 0.98]);
-    add(hip, new THREE.CapsuleGeometry(0.092, 0.235, 4, 12), m.pants, [0, -0.195, 0], null, [1, 1, 0.95]);
+    const thighGeo = limbGeometry(0, 0, 0, 0.445, 0, (t) => {
+      if (t < 0.08) return 0.082 + t * 0.13;
+      if (t < 0.55) return 0.0924 - (t - 0.08) * 0.026;
+      if (t < 0.90) return 0.0860 - (t - 0.55) * 0.030;
+      return 0.0755 - (t - 0.90) * 0.180;
+    }, { rings: 20, radial: 18 });
+    const thigh = new THREE.Mesh(thighGeo, m.pants);
+    thigh.castShadow = true; thigh.receiveShadow = true;
+    hip.add(thigh);
 
     const knee = new THREE.Group();
     knee.position.y = -0.415;
     hip.add(knee);
-    // a full joint ball keeps the knee sealed at any bend angle
-    add(knee, new THREE.SphereGeometry(0.086, 14, 11), m.pants, [0, 0.004, -0.004], null, [1, 0.96, 0.98]);
-    add(knee, new THREE.CapsuleGeometry(0.075, 0.205, 4, 12), m.pants, [0, -0.155, 0], null, [1, 1, 0.94]);
+    const shinGeo = limbGeometry(0, 0, 0, 0.325, 0, (t) => {
+      if (t < 0.07) return 0.0778 - t * 0.10;
+      if (t < 0.50) return 0.0708 - (t - 0.07) * 0.010;
+      if (t < 0.90) return 0.0665 - (t - 0.50) * 0.052;
+      return 0.0457 - (t - 0.90) * 0.200;
+    }, { rings: 18, radial: 18 });
+    const shin = new THREE.Mesh(shinGeo, m.pants);
+    shin.castShadow = true; shin.receiveShadow = true;
+    knee.add(shin);
+    // a crease across the knee instead of a joint ball
+    add(knee, new THREE.TorusGeometry(0.070, 0.009, 6, 20), m.pants, [0, 0.010, 0], [Math.PI / 2, 0, 0], [1, 1, 0.94]);
     // boot: shaft, rounded toe, thick sole, instep strap
     const foot = new THREE.Group();
     foot.position.y = -0.315;
     knee.add(foot);
-    add(foot, new THREE.CylinderGeometry(1, 1.06, 0.105, 16), m.boot, [0, -0.028, -0.004], null, [0.056, 1, 0.062]);
-    add(foot, new THREE.SphereGeometry(1, 16, 12), m.boot, [0, -0.060, -0.035], null, [0.062, 0.048, 0.105]);
-    add(foot, new THREE.SphereGeometry(1, 14, 10), m.boot, [0, -0.062, -0.120], null, [0.054, 0.040, 0.050]);
-    add(foot, new THREE.BoxGeometry(0.120, 0.034, 0.255), m.sole, [0, -0.098, -0.058]);
-    add(foot, new THREE.BoxGeometry(0.110, 0.026, 0.062), m.sole, [0, -0.092, -0.184]);
-    add(foot, new THREE.CylinderGeometry(0.060, 0.064, 0.046, 16), m.leather, [0, 0.014, 0]);
-    add(foot, new THREE.BoxGeometry(0.106, 0.014, 0.044), m.leather, [0, -0.038, -0.056], [0.35, 0, 0]);
-    add(foot, new THREE.BoxGeometry(0.092, 0.014, 0.050), m.snow, [0, -0.048, -0.152], [0.1, 0, 0]);
+    // one shell: shaft, ankle, instep and toe curves out of a single loft
+    const bootRings = [
+      [0.046, 0.004, 0.058, 0.060], [0.014, 0.000, 0.061, 0.063],
+      [-0.016, -0.008, 0.060, 0.068], [-0.042, -0.024, 0.058, 0.084],
+      [-0.066, -0.046, 0.057, 0.106], [-0.084, -0.068, 0.056, 0.124],
+      [-0.097, -0.090, 0.054, 0.132], [-0.104, -0.110, 0.048, 0.130],
+      [-0.108, -0.124, 0.038, 0.116]
+    ];
+    const boot = new THREE.Mesh(ringLoft(bootRings, 20), m.boot);
+    boot.castShadow = true; boot.receiveShadow = true;
+    foot.add(boot);
+    const soleRings = [
+      [-0.100, -0.052, 0.062, 0.128], [-0.117, -0.054, 0.064, 0.132], [-0.127, -0.056, 0.050, 0.116]
+    ];
+    const sole = new THREE.Mesh(ringLoft(soleRings, 20), m.sole);
+    sole.castShadow = true; sole.receiveShadow = true;
+    foot.add(sole);
+    add(foot, new THREE.CylinderGeometry(0.062, 0.064, 0.034, 20), m.leather, [0, 0.040, 0.004]);
+    add(foot, new THREE.BoxGeometry(0.096, 0.012, 0.050), m.snow, [0, -0.052, -0.160], [0.12, 0, 0]);
     return { hip, knee, foot };
   }
   const legR = makeLeg(1);
