@@ -9,6 +9,7 @@ const JACKETS = [
 const SCARVES = [0xb4452f, 0xd8b24a, 0x4a7d8c, 0x9c3f4f, 0x6f8f4a, 0xc26a2c];
 const SKIN_TONES = [0xd9b49a, 0xc19a7e, 0xa87e62, 0xe4c6ac, 0x8c654c, 0xcbab92];
 const HAIR_COLORS = [0x1b1310, 0x3a2718, 0x6b4f2c, 0x120e0b, 0x53341f, 0x8a6a44];
+const IRIS_COLORS = [0x5d7f72, 0x5b7f96, 0x6f8a5a, 0x7d5a48, 0x4d5f78, 0x8a6a3c];
 
 export function characterColor(id) {
   let h = 0;
@@ -144,6 +145,452 @@ const leatherBump = () => bumpTexture('leather', 256, leatherH);
 const denimBump = () => bumpTexture('denim', 256, denimH);
 const skinBump = () => bumpTexture('skin', 128, skinH);
 
+// ---------------------------------------------------------------------------
+// Head
+// A head built from stacked primitives always reads as glued-on blobs, so this
+// one is a single sphere displaced into skull, brow, cheeks, jaw, nose and
+// mouth. Eyes and mouth are separate high-resolution decals that follow the
+// sculpted surface, which keeps them crisp without a 4k albedo texture.
+// ---------------------------------------------------------------------------
+const HEAD_W = 0.093;   // half width  (18.6 cm across)
+const HEAD_H = 0.126;   // half height (25.2 cm crown to chin)
+const HEAD_D = 0.105;   // half depth  (21.0 cm face to occiput)
+
+// soft ellipsoidal falloff used by every sculpted feature
+function headGauss(x, y, z, cx, cy, cz, rx, ry, rz) {
+  const dx = (x - cx) / rx, dy = (y - cy) / ry, dz = (z - cz) / rz;
+  const q = dx * dx + dy * dy + dz * dz;
+  return q >= 1 ? 0 : Math.exp(-3.0 * q) * (1 - q);
+}
+
+// Signed displacement in metres, applied along the ellipsoid normal.
+// Positive pushes out, negative carves in. Coordinates: x right, y up, z back.
+function headSculpt(x, y, z) {
+  const g = (cx, cy, cz, rx, ry, rz) => headGauss(x, y, z, cx, cy, cz, rx, ry, rz);
+  let d = 0;
+  for (const s of [-1, 1]) {
+    d += g(s * 0.030, 0.026, -0.080, 0.048, 0.014, 0.042) * 0.0055;   // brow ridge
+    d += g(s * 0.037, 0.008, -0.084, 0.030, 0.024, 0.034) * -0.0052;  // eye socket
+    d += g(s * 0.050, -0.020, -0.068, 0.032, 0.030, 0.042) * 0.0072;  // cheek apple
+    d += g(s * 0.045, -0.052, -0.078, 0.022, 0.018, 0.030) * -0.0022; // cheek to jaw hollow
+    d += g(s * 0.060, -0.070, -0.050, 0.024, 0.026, 0.040) * 0.0040;  // jaw corner
+    d += g(s * 0.080, 0.030, -0.004, 0.022, 0.032, 0.038) * -0.0042;  // temple
+    d += g(s * 0.010, -0.038, -0.099, 0.008, 0.008, 0.016) * -0.0038; // nostril dent
+  }
+  d += g(0, 0.060, -0.072, 0.072, 0.042, 0.042) * 0.0030;   // forehead dome
+  d += g(0, -0.004, -0.097, 0.013, 0.026, 0.020) * 0.0072;  // nose bridge
+  d += g(0, -0.034, -0.098, 0.019, 0.017, 0.026) * 0.0150;  // nose tip
+  d += g(0, -0.063, -0.092, 0.024, 0.006, 0.020) * -0.0052; // mouth trough
+  d += g(0, -0.076, -0.092, 0.018, 0.009, 0.020) * 0.0032;  // lower lip
+  d += g(0, -0.101, -0.082, 0.020, 0.018, 0.028) * 0.0058;  // chin
+  d += g(0, 0.010, 0.078, 0.072, 0.080, 0.044) * 0.0042;    // occiput
+  return d;
+}
+
+let headGeoCache = null;
+function headGeometry() {
+  if (headGeoCache) return headGeoCache;
+  const geo = new THREE.SphereGeometry(1, 72, 54);
+  const pos = geo.attributes.position;
+  const p = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+    p.set(px * HEAD_W, py * HEAD_H, pz * HEAD_D);
+    // narrow the jaw towards the chin: a childlike, readable silhouette
+    const t = Math.max(0, Math.min(1, (-p.y - 0.004) / 0.104));
+    p.x *= 1 - 0.36 * t * t;
+    p.z *= 1 - 0.08 * t * t;
+    const d = headSculpt(p.x, p.y, p.z);
+    const nx = p.x / (HEAD_W * HEAD_W), ny = p.y / (HEAD_H * HEAD_H), nz = p.z / (HEAD_D * HEAD_D);
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    pos.setXYZ(i, p.x + nx / nl * d, p.y + ny / nl * d, p.z + nz / nl * d);
+  }
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  headGeoCache = geo;
+  return geo;
+}
+
+// Head point -> sphere UV (u = 0.75 faces -Z, v = 1 at the crown).
+function headUV(x, y, z) {
+  const nx = x / HEAD_W, ny = y / HEAD_H, nz = z / HEAD_D;
+  const l = Math.hypot(nx, ny, nz) || 1;
+  const u = ((Math.atan2(nz / l, -nx / l) / (Math.PI * 2)) + 1) % 1;
+  const v = 1 - Math.acos(Math.max(-1, Math.min(1, ny / l))) / Math.PI;
+  return [u, v];
+}
+
+// A flat grid wrapped onto the sculpted head: used for the eye and mouth decals
+// so a 512 px texture covers a few centimetres instead of an entire skull.
+function decalGeometry(cx, cy, cz, w, h, segX = 18, segY = 12) {
+  const dir = new THREE.Vector3(cx / (HEAD_W * HEAD_W), cy / (HEAD_H * HEAD_H), cz / (HEAD_D * HEAD_D)).normalize();
+  const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize();
+  const up = new THREE.Vector3().crossVectors(dir, right).normalize();
+  const geo = new THREE.PlaneGeometry(w, h, segX, segY);
+  const pos = geo.attributes.position;
+  const p = new THREE.Vector3();
+  const R = 0.100;
+  for (let i = 0; i < pos.count; i++) {
+    p.copy(dir)
+      .addScaledVector(right, pos.getX(i) / R)
+      .addScaledVector(up, pos.getY(i) / R)
+      .normalize();
+    const ex = p.x * HEAD_W, ey = p.y * HEAD_H, ez = p.z * HEAD_D;
+    const d = headSculpt(ex, ey, ez) + 0.0012;
+    const nx = p.x / HEAD_W, ny = p.y / HEAD_H, nz = p.z / HEAD_D;
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    pos.setXYZ(i, ex + nx / nl * d, ey + ny / nl * d, ez + nz / nl * d);
+  }
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+// Skin albedo: low-frequency tone changes and baked occlusion only. Eyes and
+// mouth are decals, so this map never has to be huge.
+function faceAlbedo(idx) {
+  const key = 'albedo:' + (idx % SKIN_TONES.length);
+  if (texCache.has(key)) return texCache.get(key);
+  const W = 1024, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#f7efe9';
+  ctx.fillRect(0, 0, W, H);
+
+  // soft elliptical patch in head space (metres)
+  const blob = (x, y, z, w, h, rgb, alpha) => {
+    const [u, v] = headUV(x, y, z);
+    const rx = Math.max(2, w * 1700), ry = Math.max(2, h * 1520);
+    ctx.save();
+    ctx.translate(u * W, (1 - v) * H);
+    ctx.scale(rx, ry);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`);
+    g.addColorStop(0.6, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha * 0.4})`);
+    g.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
+  };
+
+  for (const s of [-1, 1]) {
+    blob(s * 0.036, 0.011, -0.082, 0.034, 0.024, [118, 78, 70], 0.34);  // socket shadow
+    blob(s * 0.034, 0.024, -0.084, 0.026, 0.007, [104, 66, 58], 0.26);  // lid crease
+    blob(s * 0.052, -0.026, -0.070, 0.036, 0.030, [226, 128, 112], 0.32); // rosy cheek
+    blob(s * 0.012, -0.028, -0.095, 0.008, 0.026, [120, 78, 68], 0.26);  // nose side
+    blob(s * 0.010, -0.039, -0.096, 0.005, 0.004, [116, 80, 72], 0.34);  // nostril
+    blob(s * 0.078, 0.052, -0.020, 0.026, 0.034, [148, 106, 94], 0.16);  // temple
+    blob(s * 0.058, -0.074, -0.062, 0.020, 0.020, [140, 96, 86], 0.18);  // jaw hollow
+  }
+  blob(0, -0.032, -0.100, 0.017, 0.014, [230, 124, 108], 0.26);  // rosy nose
+  blob(0, -0.098, -0.082, 0.024, 0.014, [132, 94, 86], 0.10);    // under the chin
+  blob(0, 0.068, -0.062, 0.066, 0.018, [130, 94, 84], 0.14);     // hairline, front
+  for (const s of [-1, 1]) {
+    blob(s * 0.074, 0.030, -0.030, 0.022, 0.024, [126, 90, 82], 0.16); // hairline, side
+  }
+
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = 0.24;
+  ctx.fillStyle = ctx.createPattern(skinGrainPattern(), 'repeat');
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 4;
+  texCache.set(key, tex);
+  return tex;
+}
+
+let grainCanvas = null;
+function skinGrainPattern() {
+  if (grainCanvas) return grainCanvas;
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const n = 0.6 * tileNoise(x * 0.05, y * 0.05, 16) + 0.3 * tileNoise(x * 0.16, y * 0.16, 40) + 0.1 * hash2(x, y);
+      const v = Math.max(0, Math.min(255, 128 + (n - 0.5) * 66));
+      const i = (y * S + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  grainCanvas = c;
+  return grainCanvas;
+}
+
+function tileNoise(x, y, p) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const wrap = (a) => ((a % p) + p) % p;
+  const h = (a, b) => hash2(wrap(a), wrap(b));
+  const a = h(ix, iy), b = h(ix + 1, iy), c = h(ix, iy + 1), d = h(ix + 1, iy + 1);
+  return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
+}
+
+// Eye decal: sclera, limbal ring, iris fibres, pupil, lashes and lid shadow.
+function eyeTexture(idx, open) {
+  const key = `eye:${idx % SKIN_TONES.length}:${open ? 1 : 0}`;
+  if (texCache.has(key)) return texCache.get(key);
+  const W = 512, H = 256;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  const cx = 256, cy = 128, hw = 176, hh = 74;
+
+  const almond = () => {
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, cy + 8);
+    ctx.bezierCurveTo(cx - hw * 0.60, cy - hh * 1.00, cx + hw * 0.55, cy - hh * 1.04, cx + hw, cy - 12);
+    ctx.bezierCurveTo(cx + hw * 0.58, cy + hh * 0.96, cx - hw * 0.55, cy + hh * 0.98, cx - hw, cy + 8);
+    ctx.closePath();
+  };
+
+  if (!open) {
+    ctx.fillStyle = '#ffffff';
+    almond();
+    ctx.fill();
+    ctx.save();
+    almond();
+    ctx.clip();
+    const g = ctx.createLinearGradient(cx, cy - hh, cx, cy + hh);
+    g.addColorStop(0, 'rgba(252,242,238,0.95)');
+    g.addColorStop(0.6, 'rgba(255,255,255,0.15)');
+    g.addColorStop(1, 'rgba(150,108,98,0.32)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(26,18,14,0.88)';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(cx - hw * 0.97, cy + 6);
+    ctx.bezierCurveTo(cx - hw * 0.60, cy - hh * 0.96, cx + hw * 0.55, cy - hh * 0.98, cx + hw * 0.99, cy - 12);
+    ctx.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    texCache.set(key, tex);
+    return tex;
+  }
+
+  ctx.save();
+  almond();
+  ctx.clip();
+  const sclera = ctx.createLinearGradient(cx, cy - hh, cx, cy + hh);
+  sclera.addColorStop(0, '#a9b1ba');
+  sclera.addColorStop(0.30, '#e3e7ea');
+  sclera.addColorStop(0.66, '#f6f4f1');
+  sclera.addColorStop(1, '#d8cec8');
+  ctx.fillStyle = sclera;
+  ctx.fillRect(0, 0, W, H);
+
+  const base = new THREE.Color(IRIS_COLORS[idx % IRIS_COLORS.length]);
+  const light = base.clone().offsetHSL(0, 0.05, 0.20);
+  const dark = base.clone().offsetHSL(0, 0, -0.12);
+  const ir = 82;
+  const ig = ctx.createRadialGradient(cx, cy + 2, ir * 0.15, cx, cy + 2, ir);
+  ig.addColorStop(0, `#${light.getHexString()}`);
+  ig.addColorStop(0.48, `#${base.getHexString()}`);
+  ig.addColorStop(0.84, `#${dark.getHexString()}`);
+  ig.addColorStop(0.97, '#0b1116');
+  ig.addColorStop(1, 'rgba(8,12,16,0.1)');
+  ctx.beginPath();
+  ctx.arc(cx, cy + 2, ir, 0, Math.PI * 2);
+  ctx.fillStyle = ig;
+  ctx.fill();
+
+  ctx.globalAlpha = 0.26;
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    ctx.strokeStyle = i % 2 ? `#${light.getHexString()}` : `#${dark.getHexString()}`;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * ir * 0.32, cy + 2 + Math.sin(a) * ir * 0.32);
+    ctx.lineTo(cx + Math.cos(a) * ir * 0.94, cy + 2 + Math.sin(a) * ir * 0.94);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  const pg = ctx.createRadialGradient(cx, cy + 2, 3, cx, cy + 2, 33);
+  pg.addColorStop(0, '#05070a');
+  pg.addColorStop(0.84, '#05070a');
+  pg.addColorStop(1, 'rgba(10,14,20,0)');
+  ctx.beginPath();
+  ctx.arc(cx, cy + 2, 33, 0, Math.PI * 2);
+  ctx.fillStyle = pg;
+  ctx.fill();
+
+  const lidShadow = ctx.createLinearGradient(cx, cy - hh, cx, cy - hh * 0.1);
+  lidShadow.addColorStop(0, 'rgba(22,16,22,0.58)');
+  lidShadow.addColorStop(0.6, 'rgba(28,22,28,0.16)');
+  lidShadow.addColorStop(1, 'rgba(28,22,28,0)');
+  ctx.fillStyle = lidShadow;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  // wet catchlights
+  ctx.beginPath();
+  ctx.ellipse(cx - 28, cy - 24, 16, 12, -0.4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 32, cy + 28, 8, 6, 0.3, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.40)';
+  ctx.fill();
+
+  // upper lash line, heavier towards the outer corner
+  ctx.save();
+  almond();
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(20,14,12,0.94)';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    const t = i / 25;
+    const x0 = cx - hw + t * hw * 2;
+    const lidY = cy - hh * (0.16 + Math.sin(t * Math.PI) * 0.90) - (t - 0.5) * 20;
+    ctx.lineWidth = 3 + Math.sin(t * Math.PI) * 8 + t * 3;
+    ctx.beginPath();
+    ctx.moveTo(x0, lidY - 6);
+    ctx.lineTo(x0 + 6, lidY + 2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(22,15,12,0.85)';
+  for (let i = 0; i < 13; i++) {
+    const t = 0.08 + (i / 12) * 0.86;
+    const x0 = cx - hw + t * hw * 2;
+    const lidY = cy - hh * (0.16 + Math.sin(t * Math.PI) * 0.90) - (t - 0.5) * 20;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(x0, lidY);
+    ctx.quadraticCurveTo(x0 + 8, lidY - 11, x0 + 18, lidY - 17);
+    ctx.stroke();
+  }
+  // lower lash margin
+  ctx.strokeStyle = 'rgba(70,44,40,0.40)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - hw * 0.92, cy + hh * 0.34);
+  ctx.bezierCurveTo(cx - hw * 0.5, cy + hh * 0.94, cx + hw * 0.45, cy + hh * 0.92, cx + hw * 0.94, cy);
+  ctx.stroke();
+  ctx.restore();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  texCache.set(key, tex);
+  return tex;
+}
+
+// Mouth decal: a soft closed smile with shaded lips, transparent elsewhere.
+function mouthTexture() {
+  const key = 'mouth';
+  if (texCache.has(key)) return texCache.get(key);
+  const W = 512, H = 288;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  const cx = W / 2, cy = H * 0.56;
+
+  // upper lip
+  ctx.beginPath();
+  ctx.moveTo(cx - 190, cy - 2);
+  ctx.bezierCurveTo(cx - 120, cy - 44, cx - 40, cy - 46, cx - 6, cy - 20);
+  ctx.bezierCurveTo(cx - 2, cy - 16, cx + 2, cy - 16, cx + 6, cy - 20);
+  ctx.bezierCurveTo(cx + 40, cy - 46, cx + 120, cy - 44, cx + 190, cy - 2);
+  ctx.bezierCurveTo(cx + 120, cy + 4, cx - 120, cy + 4, cx - 190, cy - 2);
+  ctx.closePath();
+  const upGrad = ctx.createLinearGradient(0, cy - 48, 0, cy + 4);
+  upGrad.addColorStop(0, 'rgba(196,124,112,0.34)');
+  upGrad.addColorStop(0.7, 'rgba(178,104,94,0.52)');
+  upGrad.addColorStop(1, 'rgba(150,78,72,0.62)');
+  ctx.fillStyle = upGrad;
+  ctx.fill();
+
+  // lower lip
+  ctx.beginPath();
+  ctx.moveTo(cx - 186, cy + 2);
+  ctx.bezierCurveTo(cx - 110, cy + 30, cx + 110, cy + 30, cx + 186, cy + 2);
+  ctx.bezierCurveTo(cx + 110, cy + 74, cx - 110, cy + 74, cx - 186, cy + 2);
+  ctx.closePath();
+  const lowGrad = ctx.createLinearGradient(0, cy + 2, 0, cy + 72);
+  lowGrad.addColorStop(0, 'rgba(158,86,80,0.62)');
+  lowGrad.addColorStop(0.55, 'rgba(212,140,126,0.46)');
+  lowGrad.addColorStop(1, 'rgba(196,124,112,0.08)');
+  ctx.fillStyle = lowGrad;
+  ctx.fill();
+
+  // smile line
+  ctx.strokeStyle = 'rgba(78,38,32,0.82)';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 5.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - 186, cy - 6);
+  ctx.bezierCurveTo(cx - 110, cy + 22, cx + 110, cy + 22, cx + 186, cy - 6);
+  ctx.stroke();
+
+  // corner dimples
+  for (const s of [-1, 1]) {
+    ctx.fillStyle = 'rgba(96,48,44,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 190, cy + 2, 9, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  texCache.set(key, tex);
+  return tex;
+}
+
+// Hair cap: a grid wrapped onto the skull that opens for the face. The bottom
+// edge rises at the temples and drops at the nape, so the hairline is a curve
+// rather than the rectangular patch a sphere segment leaves behind.
+function hairGeometry() {
+  const COLS = 46, ROWS = 12;
+  const GAP = Math.PI * 1.28;                 // short hair: the back of the head only
+  const start = Math.PI * 1.5 + GAP / 2;
+  const span = Math.PI * 2 - GAP;
+  const RX = HEAD_W + 0.0040, RY = HEAD_H + 0.0052, RZ = HEAD_D + 0.0046;
+  const pos = [], idx = [];
+  for (let i = 0; i <= COLS; i++) {
+    const u = i / COLS;
+    const phi = start + u * span;
+    // The edge runs down exactly behind the ears, so the ear covers the seam,
+    // and the hair sinks to the nape at the back of the head.
+    const t = Math.abs(u - 0.5) * 2;                       // 0 nape .. 1 edge
+    const yBot = -0.028 - 0.030 * Math.pow(1 - t, 1.2);
+    const thetaBot = Math.acos(Math.max(-1, Math.min(1, yBot / RY)));
+    const thetaTop = Math.acos(0.098 / RY);   // tucked inside the hat
+    for (let j = 0; j <= ROWS; j++) {
+      const theta = thetaTop + (thetaBot - thetaTop) * (j / ROWS);
+      const st = Math.sin(theta);
+      pos.push(-Math.cos(phi) * st * RX, Math.cos(theta) * RY, Math.sin(phi) * st * RZ);
+    }
+  }
+  for (let i = 0; i < COLS; i++) {
+    for (let j = 0; j < ROWS; j++) {
+      const a = i * (ROWS + 1) + j, b = a + ROWS + 1;
+      idx.push(a, a + 1, b, b, a + 1, b + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
 const fabricNormal = () => normalTexture('fabric', 256, fabricH, 2.6);
 const knitNormal = () => normalTexture('knit', 256, knitH, 3.0);
 const leatherNormal = () => normalTexture('leather', 256, leatherH, 2.2);
@@ -196,6 +643,27 @@ function materialsFor(idx) {
       sheen: 0.5, sheenRoughness: 0.72, sheenColor: new THREE.Color(0xf0b49c),
       clearcoat: 0.05, clearcoatRoughness: 0.7, envMapIntensity: 0.42
     }),
+    // the sculpted head carries its own albedo; decals add eyes and mouth
+    face: new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(skinColor).multiplyScalar(0.98), roughness: 0.6, metalness: 0,
+      map: faceAlbedo(idx),
+      normalMap: skinNormal(), normalScale: new THREE.Vector2(0.09, 0.09),
+      sheen: 0.16, sheenRoughness: 0.82, sheenColor: new THREE.Color(0xf3bcab),
+      envMapIntensity: 0.3
+    }),
+    eyeOpen: new THREE.MeshPhysicalMaterial({
+      map: eyeTexture(idx, true), transparent: true, roughness: 0.25, metalness: 0,
+      clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 0.9,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
+    }),
+    eyeClosed: new THREE.MeshStandardMaterial({
+      map: eyeTexture(idx, false), transparent: true, roughness: 0.6, metalness: 0,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
+    }),
+    mouth: new THREE.MeshStandardMaterial({
+      map: mouthTexture(), transparent: true, roughness: 0.45, metalness: 0,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
+    }),
     skinShadow: new THREE.MeshStandardMaterial({
       color: new THREE.Color(skinColor).multiplyScalar(0.78), roughness: 0.7, metalness: 0,
       envMapIntensity: 0.2
@@ -203,6 +671,10 @@ function materialsFor(idx) {
     skinRed: new THREE.MeshStandardMaterial({
       color: new THREE.Color(skinColor).lerp(new THREE.Color(0xd0664f), 0.24),
       roughness: 0.6, metalness: 0, envMapIntensity: 0.3
+    }),
+    brow: new THREE.MeshStandardMaterial({
+      color: new THREE.Color(HAIR_COLORS[idx % HAIR_COLORS.length]).offsetHSL(0, 0.10, 0.15),
+      roughness: 0.85, metalness: 0
     }),
     hair: new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0 }),
     leather: new THREE.MeshPhysicalMaterial({
@@ -214,7 +686,7 @@ function materialsFor(idx) {
       color: 0x191d21, roughness: 0.66, metalness: 0.03,
       normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.8, 0.8), envMapIntensity: 0.6
     }),
-    sole: new THREE.MeshStandardMaterial({ color: 0x0e1013, roughness: 0.9, metalness: 0 }),
+    sole: new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.85, metalness: 0 }),
     metal: new THREE.MeshStandardMaterial({ color: 0x9aa4ad, roughness: 0.32, metalness: 0.9, envMapIntensity: 1.2 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x14181d, roughness: 0.62, metalness: 0.08, envMapIntensity: 0.6 }),
     lens: new THREE.MeshPhysicalMaterial({
@@ -306,102 +778,84 @@ export function createCharacter(colorIdx) {
   for (const d of dust) add(torsoGroup, new THREE.SphereGeometry(1, 8, 6), m.snow, [d[0], d[1], d[2]], null, [d[3], d[4], d[5]]);
 
   // ---- neck / head ------------------------------------------------------
-  const neck = add(hips, new THREE.CylinderGeometry(0.052, 0.06, 0.10, 12), m.skin, [0, 0.655, -0.005]);
+  // One sculpted head. Every feature sits at a measured position: eyes at the
+  // socket dents, mouth in the trough, ears at the widest point of the skull.
+  const neck = add(hips, new THREE.CylinderGeometry(0.050, 0.058, 0.17, 16), m.skin, [0, 0.680, -0.006]);
   neck.castShadow = false;
 
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 0.758, -0.01);
-  // exaggerated head size: instantly reads as a stylised character, not a mannequin
-  headGroup.scale.setScalar(1.18);
+  headGroup.position.set(0, 0.760, -0.008);
   hips.add(headGroup);
 
-  // skull + jaw
-  add(headGroup, new THREE.SphereGeometry(0.107, 22, 18), m.skin, [0, 0.02, 0], null, [1.0, 1.10, 1.03]);
-  add(headGroup, new THREE.SphereGeometry(0.090, 18, 14), m.skin, [0, -0.040, -0.030], null, [0.86, 0.80, 0.92]);
-  // ears with a shaded inner shell
+  const headMesh = add(headGroup, headGeometry(), m.face, [0, 0, 0]);
+  headMesh.castShadow = true;
+
+  add(headGroup, decalGeometry(0, -0.061, -0.092, 0.076, 0.044, 18, 12), m.mouth);
+
+  const blinkers = [];
   for (const side of [-1, 1]) {
-    add(headGroup, new THREE.SphereGeometry(0.028, 12, 10), m.skin, [side * 0.104, 0.004, 0.002], null, [0.5, 1.02, 0.78]);
-    add(headGroup, new THREE.SphereGeometry(0.015, 8, 6), m.skinShadow, [side * 0.110, 0.002, -0.006], null, [0.34, 0.72, 0.5]);
-  }
-  // brow ridge and cheekbones break up the sphere of the skull
-  add(headGroup, new THREE.SphereGeometry(0.101, 18, 12), m.skin, [0, 0.030, -0.020], null, [1.0, 0.46, 0.96]);
-  for (const side of [-1, 1]) {
-    add(headGroup, new THREE.SphereGeometry(0.028, 12, 10), m.skin, [side * 0.058, -0.008, -0.066], null, [1, 0.62, 0.4]);
-  }
-  // jaw and chin
-  add(headGroup, new THREE.SphereGeometry(0.042, 14, 10), m.skin, [0, -0.066, -0.056], null, [0.96, 0.72, 0.68]);
-  // nose: soft bridge, rounded tip, alae and nostrils
-  add(headGroup, new THREE.CapsuleGeometry(0.0098, 0.036, 3, 8), m.skin, [0, 0.014, -0.0970], [-0.12, 0, 0], [1, 1, 0.8]);
-  add(headGroup, new THREE.SphereGeometry(0.0142, 12, 10), m.skin, [0, -0.0125, -0.1020], null, [1.02, 0.92, 1.0]);
-  for (const side of [-1, 1]) {
-    add(headGroup, new THREE.SphereGeometry(0.0102, 8, 6), m.skin, [side * 0.0155, -0.0195, -0.0995], null, [1, 0.8, 0.9]);
-    add(headGroup, new THREE.SphereGeometry(0.0046, 6, 5), m.skinShadow, [side * 0.0095, -0.0265, -0.1050], null, [1, 0.66, 0.5]);
-  }
-  // eyes: shallow sockets, open globes with irises, lids and a warm highlight
-  const lids = [];
-  for (const side of [-1, 1]) {
-    const ex = side * 0.041;
-    add(headGroup, new THREE.SphereGeometry(0.0232, 14, 12), m.skinShadow, [ex, 0.0198, -0.0892], null, [1.06, 0.82, 0.36]);
-    add(headGroup, new THREE.SphereGeometry(0.0168, 16, 14), m.eyeWhite, [ex, 0.0198, -0.0978], null, [1, 0.66, 0.52]);
-    add(headGroup, new THREE.SphereGeometry(0.0106, 14, 12), m.iris, [ex + side * 0.0014, 0.0188, -0.1073], null, [1, 1, 0.55]);
-    add(headGroup, new THREE.SphereGeometry(0.0048, 10, 8), m.pupil, [ex + side * 0.0014, 0.0186, -0.1102], null, [1, 1, 0.55]);
-    add(headGroup, new THREE.SphereGeometry(0.0029, 8, 6), m.eyeWhite, [ex + side * 0.0048, 0.0234, -0.1110], null, [1, 1, 0.6]);
-    // dark lash line dominates the upper edge so the eye reads almond-shaped
-    add(headGroup, new THREE.BoxGeometry(0.026, 0.0018, 0.005), m.skinShadow, [ex, 0.0262, -0.1012], [0, 0, side * 0.07]);
-    // upper lid with a hooded crease, lower lid and a soft lash line
-    const upperLid = add(headGroup, new THREE.SphereGeometry(0.0186, 14, 10), m.skin, [ex, 0.0296, -0.0952], [-0.24, 0, 0], [1.05, 0.56, 0.62]);
-    upperLid.userData.baseY = 0.56;
-    lids.push(upperLid);
-    const lowerLid = add(headGroup, new THREE.SphereGeometry(0.0174, 12, 8), m.skin, [ex, 0.0106, -0.0958], [0.24, 0, 0], [1.02, 0.32, 0.55]);
-    lowerLid.userData.baseY = 0.32;
-    lids.push(lowerLid);
-    add(headGroup, new THREE.BoxGeometry(0.029, 0.0018, 0.005), m.skinShadow, [ex, 0.0242, -0.1018], [0, 0, side * 0.06]);
-    // brows follow the ridge, thicker towards the nose
-    add(headGroup, new THREE.BoxGeometry(0.042, 0.0062, 0.010), m.hair, [ex, 0.0510, -0.0970], [0.06, side * 0.12, side * 0.12]);
-  }
-  // mouth: upper and lower lip with a soft, closed smile
-  add(headGroup, new THREE.CapsuleGeometry(0.0072, 0.028, 3, 8), m.lip, [0, -0.0625, -0.0935], [0, 0, Math.PI / 2], [1, 1, 0.85]);
-  add(headGroup, new THREE.CapsuleGeometry(0.0094, 0.024, 3, 8), m.lip, [0, -0.0748, -0.0915], [-0.06, 0, Math.PI / 2], [1, 1, 0.95]);
-  // a curved mouth line reads as a smile instead of a flat slot
-  add(headGroup, new THREE.TorusGeometry(0.030, 0.0019, 6, 18, Math.PI * 0.55), m.lipDark,
-    [0, -0.0385, -0.0958], [0, 0, -Math.PI / 2 - Math.PI * 0.275]);
-  for (const side of [-1, 1]) {
-    add(headGroup, new THREE.SphereGeometry(0.0042, 6, 5), m.lip, [side * 0.0175, -0.0685, -0.0910], null, [1, 0.9, 0.7]);
-  }
-  // hair: a shell around the back and sides of the skull, open at the face
-  add(headGroup, new THREE.SphereGeometry(0.111, 18, 14, 0, Math.PI, 0, Math.PI * 0.72), m.hair, [0, 0.02, 0], null, [1.0, 1.08, 1.03]);
-  add(headGroup, new THREE.SphereGeometry(0.109, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.34), m.hair, [0, 0.045, 0], null, [1.0, 1.0, 1.02]);
-  // loose strands peeking out under the beanie
-  for (let i = 0; i < 5; i++) {
-    const t = (i - 2) / 2;
-    add(headGroup, new THREE.CapsuleGeometry(0.0095, 0.026, 3, 6), m.hair,
-      [t * 0.048, 0.0655 - Math.abs(t) * 0.005, -0.0935], [0.42, 0, t * 0.5], [1, 1, 0.62]);
+    // eye decal: open and shut share one surface patch so the blink cannot slip
+    const patch = decalGeometry(side * 0.037, 0.012, -0.086, 0.054, 0.031, 20, 14);
+    const openEye = new THREE.Mesh(patch, m.eyeOpen);
+    openEye.renderOrder = 3;
+    headGroup.add(openEye);
+    const shutEye = new THREE.Mesh(patch, m.eyeClosed);
+    shutEye.renderOrder = 4;
+    shutEye.visible = false;
+    headGroup.add(shutEye);
+    blinkers.push({ open: openEye, shut: shutEye });
+
+    // brow: overlapping clumps read as one soft arch, not separate beads
+    // brow: one smooth tube following the skull, never a row of beads
+    const browPts = [];
+    for (let i = 0; i <= 5; i++) {
+      const t = i / 5;
+      const bx = side * (0.0125 + t * 0.0395);
+      const by = 0.0250 + Math.sin(t * Math.PI) * 0.0030 - t * 0.0022;
+      const bz = -HEAD_D * Math.sqrt(Math.max(0, 1 - (bx / HEAD_W) ** 2 - (by / HEAD_H) ** 2)) - 0.0020;
+      browPts.push(new THREE.Vector3(bx, by, bz));
+    }
+    add(headGroup, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(browPts), 20, 0.0029, 7, false), m.brow);
+
+    // ear: shell pinched against the skull, shaded bowl inside
+    add(headGroup, new THREE.SphereGeometry(0.0210, 14, 12), m.skin,
+      [side * 0.1000, 0.001, 0.008], [0.10, side * -0.40, side * 0.05], [0.34, 1.0, 0.78]);
+    add(headGroup, new THREE.SphereGeometry(0.0105, 10, 8), m.skinShadow,
+      [side * 0.1055, 0.001, -0.003], [0.10, side * -0.40, side * 0.05], [0.34, 0.86, 0.50]);
   }
 
-  // beanie, worn above the brow line
-  add(headGroup, new THREE.SphereGeometry(0.114, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.56), m.beanie, [0, 0.086, 0], null, [1.02, 1.02, 1.03]);
-  add(headGroup, new THREE.CylinderGeometry(0.112, 0.114, 0.048, 20, 1, true), m.beanie, [0, 0.088, 0], null, [1.02, 1, 1.03]);
-  add(headGroup, new THREE.SphereGeometry(0.030, 12, 10), m.snow, [0, 0.198, 0], null, [1, 0.85, 1]);
-  add(headGroup, new THREE.SphereGeometry(0.018, 8, 6), m.beanie, [0.03, 0.184, -0.01]);
-  // goggles pushed up on the hat: strap, frame and two round lenses
-  add(headGroup, new THREE.TorusGeometry(0.1165, 0.0075, 8, 26), m.dark, [0, 0.100, 0], [Math.PI / 2, 0, 0], [1.02, 1, 1.03]);
-  add(headGroup, new THREE.BoxGeometry(0.098, 0.036, 0.020), m.dark, [0, 0.1135, -0.0905], [-0.34, 0, 0]);
+  add(headGroup, hairGeometry(), m.hair, [0, 0.000, 0]);
+
+  // beanie fitted to the skull: dome from the brow line to the crown
+  // One lathed profile: rolled brim, soft fold and a dome that clears the
+  // skull by a few millimetres at every height.
+  const hatProfile = [
+    [0.0900, 0.0612], [0.0924, 0.0634], [0.0932, 0.0694], [0.0920, 0.0787],
+    [0.0898, 0.0834], [0.0882, 0.0932], [0.0806, 0.1132], [0.0648, 0.1312],
+    [0.0402, 0.1352], [0.0180, 0.1390], [0.0002, 0.1400]
+  ].map((p) => new THREE.Vector2(p[0], p[1]));
+  add(headGroup, new THREE.LatheGeometry(hatProfile, 34), m.beanie, [0, 0, 0]);
+  add(headGroup, new THREE.SphereGeometry(0.0265, 14, 12), m.snow, [0, 0.1382, 0], null, [1, 0.9, 1]);
+  // goggles pushed up onto the brim
+  add(headGroup, new THREE.TorusGeometry(0.0942, 0.0045, 8, 26), m.dark, [0, 0.0922, 0],
+    [Math.PI / 2, 0, 0], [1, 1, 1.04]);
+  add(headGroup, new THREE.BoxGeometry(0.070, 0.020, 0.014), m.dark, [0, 0.0907, -0.0900], [-0.26, 0, 0]);
   for (const side of [-1, 1]) {
-    add(headGroup, new THREE.CylinderGeometry(0.0295, 0.0295, 0.014, 18), m.lens, [side * 0.0295, 0.117, -0.1005], [Math.PI / 2 - 0.34, 0, 0], [1, 1, 0.9]);
-    add(headGroup, new THREE.TorusGeometry(0.0295, 0.0048, 8, 18), m.dark, [side * 0.0295, 0.117, -0.1015], [Math.PI / 2 - 0.34, 0, 0]);
+    add(headGroup, new THREE.CylinderGeometry(0.0185, 0.0185, 0.011, 16), m.lens,
+      [side * 0.0225, 0.0917, -0.0945], [Math.PI / 2 - 0.26, 0, 0], [1, 1, 0.94]);
+    add(headGroup, new THREE.TorusGeometry(0.0185, 0.0038, 8, 16), m.dark,
+      [side * 0.0225, 0.0917, -0.0952], [Math.PI / 2 - 0.26, 0, 0]);
   }
-  // frost on the brows
-  add(headGroup, new THREE.SphereGeometry(0.016, 8, 6), m.snow, [-0.052, 0.072, -0.100], null, [1.4, 0.35, 0.35]);
-  add(headGroup, new THREE.SphereGeometry(0.012, 8, 6), m.snow, [0.050, 0.074, -0.100], null, [1.4, 0.35, 0.35]);
 
   // ---- scarf ------------------------------------------------------------
-  add(headGroup, new THREE.TorusGeometry(0.096, 0.036, 10, 20), m.scarf, [0, -0.118, 0], [Math.PI / 2, 0, 0], [1, 1, 0.85]);
+  add(headGroup, new THREE.TorusGeometry(0.072, 0.020, 10, 28), m.scarf, [0, -0.126, 0],
+    [Math.PI / 2, 0, 0], [1.04, 0.86, 0.94]);
   const scarfTail = new THREE.Group();
-  scarfTail.position.set(0.055, -0.135, -0.035);
+  scarfTail.position.set(0.052, -0.148, -0.036);
   headGroup.add(scarfTail);
-  add(scarfTail, new THREE.BoxGeometry(0.085, 0.20, 0.036), m.scarf, [0.01, -0.10, 0], [0.06, 0, 0.10]);
-  add(scarfTail, new THREE.BoxGeometry(0.078, 0.16, 0.032), m.scarf, [0.03, -0.26, 0.012], [0.02, 0.1, 0.18]);
-  add(scarfTail, new THREE.BoxGeometry(0.062, 0.03, 0.03), m.scarf, [0.045, -0.345, 0.02], [0, 0.1, 0.2]);
+  add(scarfTail, new THREE.BoxGeometry(0.082, 0.19, 0.034), m.scarf, [0.01, -0.095, 0], [0.06, 0, 0.10]);
+  add(scarfTail, new THREE.BoxGeometry(0.074, 0.15, 0.030), m.scarf, [0.028, -0.245, 0.012], [0.02, 0.1, 0.18]);
+  add(scarfTail, new THREE.BoxGeometry(0.058, 0.028, 0.028), m.scarf, [0.042, -0.325, 0.020], [0, 0.1, 0.2]);
 
   // ---- arms -------------------------------------------------------------
   function makeArm(side) {
@@ -411,7 +865,7 @@ export function createCharacter(colorIdx) {
     torsoGroup.add(shoulder);
 
     // shoulder pad
-    add(shoulder, new THREE.SphereGeometry(0.062, 16, 12), m.jacket, [side * 0.003, -0.018, 0], null, [1.02, 0.94, 0.96]);
+    add(shoulder, new THREE.SphereGeometry(0.058, 16, 12), m.jacket, [side * 0.002, -0.024, 0], null, [1.04, 0.88, 0.96]);
     // upper arm
     add(shoulder, new THREE.CapsuleGeometry(0.059, 0.178, 4, 14), m.jacket, [0, -0.155, 0], null, [1, 1, 0.96]);
 
@@ -422,20 +876,16 @@ export function createCharacter(colorIdx) {
     add(elbow, new THREE.CapsuleGeometry(0.052, 0.168, 4, 14), m.jacket, [0, -0.135, 0], null, [1, 1, 0.94]);
     // knit cuff
     add(elbow, new THREE.CylinderGeometry(0.050, 0.055, 0.052, 14), m.scarf, [0, -0.245, 0]);
-    // glove: chunky cartoon mitt
+    // mitten: one soft palm, a thumb and a knit cuff — cleaner than four fingers
     const hand = new THREE.Group();
     hand.position.y = -0.285;
-    hand.scale.setScalar(1.12);
     elbow.add(hand);
-    add(hand, new THREE.CapsuleGeometry(0.030, 0.055, 4, 12), m.leather, [0, -0.035, -0.004], [0.1, 0, 0], [1.12, 1, 0.85]);
-    add(hand, new THREE.SphereGeometry(0.032, 12, 10), m.leather, [0, 0.012, 0], null, [1.05, 0.8, 0.95]);
-    for (let f = 0; f < 4; f++) {
-      add(hand, new THREE.CapsuleGeometry(0.0105, 0.020, 3, 8), m.leather,
-        [-0.023 + f * 0.0155, -0.078, -0.012], [0.45, 0, 0]);
-      add(hand, new THREE.CapsuleGeometry(0.0085, 0.014, 3, 6), m.leather,
-        [-0.023 + f * 0.0155, -0.095, -0.020], [0.9, 0, 0]);
-    }
-    add(hand, new THREE.CapsuleGeometry(0.014, 0.030, 3, 8), m.leather, [side * -0.040, -0.045, -0.018], [0.3, 0, side * 0.7]);
+    add(hand, new THREE.CylinderGeometry(0.040, 0.045, 0.032, 16), m.scarf, [0, 0.004, 0]);
+    add(hand, new THREE.SphereGeometry(1, 16, 12), m.leather, [0, -0.048, -0.006], [0.06, 0, 0], [0.046, 0.062, 0.036]);
+    add(hand, new THREE.SphereGeometry(1, 12, 10), m.leather, [0, -0.098, -0.004], null, [0.030, 0.020, 0.030]);
+    add(hand, new THREE.CapsuleGeometry(0.0145, 0.030, 4, 10), m.leather,
+      [side * -0.038, -0.052, -0.018], [0.25, 0, side * 0.95]);
+    add(hand, new THREE.SphereGeometry(1, 8, 6), m.snow, [0, 0.016, -0.020], null, [0.032, 0.010, 0.020]);
     return { shoulder, elbow, hand };
   }
   const armR = makeArm(1);
@@ -455,16 +905,18 @@ export function createCharacter(colorIdx) {
     // a full joint ball keeps the knee sealed at any bend angle
     add(knee, new THREE.SphereGeometry(0.086, 14, 11), m.pants, [0, 0.004, -0.004], null, [1, 0.96, 0.98]);
     add(knee, new THREE.CapsuleGeometry(0.075, 0.205, 4, 12), m.pants, [0, -0.155, 0], null, [1, 1, 0.94]);
-    // boot: oversized cartoon boot
+    // boot: shaft, rounded toe, thick sole, instep strap
     const foot = new THREE.Group();
     foot.position.y = -0.315;
-    foot.scale.setScalar(1.13);
     knee.add(foot);
-    add(foot, new THREE.BoxGeometry(0.105, 0.095, 0.135), m.boot, [0, -0.035, -0.012]);
-    add(foot, new THREE.BoxGeometry(0.098, 0.072, 0.115), m.boot, [0, -0.052, -0.105], [0.08, 0, 0]);
-    add(foot, new THREE.BoxGeometry(0.112, 0.032, 0.265), m.sole, [0, -0.086, -0.050]);
-    add(foot, new THREE.BoxGeometry(0.100, 0.016, 0.052), m.snow, [0, -0.068, -0.160], [0.1, 0, 0]);
-    add(foot, new THREE.CylinderGeometry(0.058, 0.062, 0.045, 12), m.leather, [0, 0.012, 0]);
+    add(foot, new THREE.CylinderGeometry(1, 1.06, 0.105, 16), m.boot, [0, -0.028, -0.004], null, [0.056, 1, 0.062]);
+    add(foot, new THREE.SphereGeometry(1, 16, 12), m.boot, [0, -0.060, -0.035], null, [0.062, 0.048, 0.105]);
+    add(foot, new THREE.SphereGeometry(1, 14, 10), m.boot, [0, -0.062, -0.120], null, [0.054, 0.040, 0.050]);
+    add(foot, new THREE.BoxGeometry(0.120, 0.034, 0.255), m.sole, [0, -0.098, -0.058]);
+    add(foot, new THREE.BoxGeometry(0.110, 0.026, 0.062), m.sole, [0, -0.092, -0.184]);
+    add(foot, new THREE.CylinderGeometry(0.060, 0.064, 0.046, 16), m.leather, [0, 0.014, 0]);
+    add(foot, new THREE.BoxGeometry(0.106, 0.014, 0.044), m.leather, [0, -0.038, -0.056], [0.35, 0, 0]);
+    add(foot, new THREE.BoxGeometry(0.092, 0.014, 0.050), m.snow, [0, -0.048, -0.152], [0.1, 0, 0]);
     return { hip, knee, foot };
   }
   const legR = makeLeg(1);
@@ -544,9 +996,9 @@ export function createCharacter(colorIdx) {
       state.blinkT -= dt;
       if (state.blinkT <= 0) { state.blinkT = 2.2 + Math.random() * 4.8; state.blinkPhase = 0.0001; }
       if (state.blinkPhase > 0) {
-        state.blinkPhase += dt / 0.15;
-        const k = Math.sin(Math.min(1, state.blinkPhase) * Math.PI);
-        for (const l of lids) l.scale.y = l.userData.baseY * (1 - k * 0.9);
+        state.blinkPhase += dt / 0.16;
+        const shut = state.blinkPhase < 0.8;
+        for (const b of blinkers) { b.shut.visible = shut; b.open.visible = !shut; }
         if (state.blinkPhase >= 1) state.blinkPhase = 0;
       }
     }
@@ -741,7 +1193,7 @@ export function makeNameTag(name, colorIdx) {
   });
   const sprite = new THREE.Sprite(material);
   sprite.scale.set(1.02, 0.255, 1);
-  sprite.position.y = 1.96;
+  sprite.position.y = 1.90;
   sprite.renderOrder = 5;
   return sprite;
 }

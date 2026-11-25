@@ -137,8 +137,11 @@ snowball-war/
   Distanznebel, 7.500 Schneeflocken (GPU-Punkte) und glitzernde Eiskristalle.
 - **Physik:** parabelfliegende Schneebälle mit Sub-Stepping, Boden-/Objekt-/Körper-
   Kollision, Host-autoritativ mit Spawn-Schutz.
-- **Figuren:** prozedurale Stilisierung mit großem Kopf, klobigen Handschuhen und Stiefeln;
-  Kugelgelenke an Schulter, Ellbogen, Hüfte und Knie verhindern Lücken bei jeder Beugung.
+- **Figuren:** prozedurale Stilisierung mit großem Kopf, klobigen Fäustlingen und Stiefeln;
+  der Kopf ist **eine** modellierte Fläche (Schädel, Brauenwulst, Wangen, Kinn, Nase) statt
+  gestapelter Kugeln, Augen und Mund sind hochauflösende Decals auf der echten Oberfläche,
+  Mütze und Haaransatz sind berechnete Profile; Kugelgelenke an Schulter, Ellbogen, Hüfte
+  und Knie verhindern Lücken bei jeder Beugung.
 - **Animation:** gewichtsbasierter Lauf-Zyklus (Fersenkontakt → Abdruck → Abstoß), Becken-
   und Oberkörper-Gegendrehung, Armpendel mit Ellbogenbeuge, Lean in Kurven, Blinzeln,
   Atem-Idle mit gelegentlichem Blick, Wurf in Schlüsselposen (Ausholen → Schnapp → Nach-
