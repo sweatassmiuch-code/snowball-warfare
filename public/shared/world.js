@@ -205,6 +205,8 @@ export function clampToWorld(pos) {
 }
 
 export function pickSpawn(players, forId) {
+  // Prefer the pad farthest from everyone, but never hand out a pad someone is
+  // already standing on: pure distance scoring let two players share a spawn.
   let best = SPAWNS[0], bestScore = -Infinity;
   for (const s of SPAWNS) {
     let nearest = 999;
@@ -212,7 +214,7 @@ export function pickSpawn(players, forId) {
       if (p.id === forId || p.dead) continue;
       nearest = Math.min(nearest, Math.hypot(p.pos.x - s.x, p.pos.z - s.z));
     }
-    const score = nearest + Math.random() * 12;
+    const score = (nearest < 12 ? nearest - 1000 : nearest) + Math.random() * 10;
     if (score > bestScore) { bestScore = score; best = s; }
   }
   return best;

@@ -270,7 +270,7 @@ scene.add(camera);
 const effects = createEffects(scene, settings.quality);
 const audio = createAudio();
 
-const viewmodel = createViewModel();
+const viewmodel = createViewModel(settings.look);
 camera.add(viewmodel.group);
 viewmodel.setVisible(false);
 
@@ -1524,6 +1524,13 @@ function updateLocalPlayer(dt, realDt = dt) {
   G.mouseSwayX *= Math.max(0, 1 - realDt * 7);
   G.mouseSwayY *= Math.max(0, 1 - realDt * 7);
 
+  // The arm sits at a fixed distance from the eye, so a narrow window makes it
+  // read as a tree trunk. Scale the pivots with the field of view instead of
+  // pushing them back, which would drag the hand into the middle of the screen.
+  const vmScale = THREE.MathUtils.clamp(camera.aspect / 1.62, 0.58, 1.0);
+  for (const part of viewmodel.group.children) {
+    if (part.scale.x !== vmScale) part.scale.setScalar(vmScale);
+  }
   viewmodel.update(realDt, {
     speed, sprinting, charging: G.charge,
     swayX, swayY, grounded: G.grounded

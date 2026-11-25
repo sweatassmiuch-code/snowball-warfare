@@ -513,6 +513,12 @@ function mouthTexture() {
   const ctx = c.getContext('2d');
   const cx = W / 2, cy = H * 0.56;
 
+  // Drawn at full width the mouth covered three quarters of the decal and read
+  // as a moustache on the face, so pull the whole shape in around its centre.
+  ctx.translate(cx, cy);
+  ctx.scale(0.66, 0.92);
+  ctx.translate(-cx, -cy);
+
   // upper lip
   ctx.beginPath();
   ctx.moveTo(cx - 190, cy - 2);
@@ -524,7 +530,7 @@ function mouthTexture() {
   const upGrad = ctx.createLinearGradient(0, cy - 48, 0, cy + 4);
   upGrad.addColorStop(0, 'rgba(196,124,112,0.34)');
   upGrad.addColorStop(0.7, 'rgba(178,104,94,0.52)');
-  upGrad.addColorStop(1, 'rgba(150,78,72,0.62)');
+  upGrad.addColorStop(1, 'rgba(150,78,72,0.5)');
   ctx.fillStyle = upGrad;
   ctx.fill();
 
@@ -901,8 +907,8 @@ export function createCharacter(colorIdx, look) {
   const jacketSections = [
     [-0.074, 0.176, 0.120], [-0.030, 0.178, 0.122], [0.040, 0.172, 0.122],
     [0.120, 0.166, 0.118], [0.200, 0.168, 0.120], [0.280, 0.176, 0.126],
-    [0.350, 0.190, 0.134], [0.420, 0.206, 0.142], [0.470, 0.216, 0.146],
-    [0.505, 0.214, 0.141], [0.535, 0.196, 0.132], [0.560, 0.160, 0.120],
+    [0.350, 0.192, 0.134], [0.420, 0.210, 0.143], [0.470, 0.222, 0.147],
+    [0.505, 0.219, 0.142], [0.535, 0.200, 0.133], [0.560, 0.162, 0.120],
     [0.582, 0.118, 0.106], [0.600, 0.100, 0.098]
   ];
   const torso = add(torsoGroup, loftGeometry(jacketSections, 32), m.jacket, [0, 0, 0]);
@@ -958,8 +964,8 @@ export function createCharacter(colorIdx, look) {
   neck.castShadow = false;
 
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 0.752, -0.008);
-  headGroup.scale.setScalar(1.14);      // 6.4 heads tall: reads as a stylised kid
+  headGroup.position.set(0, 0.746, -0.008);
+  headGroup.scale.setScalar(1.24);      // ~5.9 heads tall: cartoon, not adult
   hips.add(headGroup);
 
   const headMesh = add(headGroup, headGeometry(), m.face, [0, 0, 0]);
@@ -1004,15 +1010,17 @@ export function createCharacter(colorIdx, look) {
   // beanie fitted to the skull: dome from the brow line to the crown
   // One lathed profile: rolled brim, soft fold and a dome that clears the
   // skull by a few millimetres at every height.
+  // brim pulled down over the forehead: worn high, the beanie read as a cap
+  // perched on top of the skull
   const hatProfile = [
-    [0.0896, 0.0576], [0.0930, 0.0602], [0.0942, 0.0690], [0.0932, 0.0792],
-    [0.0902, 0.0850], [0.0888, 0.0962], [0.0850, 0.1148], [0.0742, 0.1352],
-    [0.0540, 0.1478], [0.0290, 0.1540], [0.0002, 0.1554]
+    [0.0898, 0.0392], [0.0934, 0.0418], [0.0946, 0.0510], [0.0936, 0.0616],
+    [0.0904, 0.0676], [0.0890, 0.0812], [0.0852, 0.1030], [0.0744, 0.1256],
+    [0.0542, 0.1410], [0.0292, 0.1482], [0.0002, 0.1496]
   ].map((p) => new THREE.Vector2(p[0], p[1]));
   add(headGroup, new THREE.LatheGeometry(hatProfile, 34), m.beanie, [0, 0, 0]);
-  add(headGroup, new THREE.SphereGeometry(0.0275, 14, 12), m.snow, [0, 0.1530, 0], null, [1, 0.88, 1]);
+  add(headGroup, new THREE.SphereGeometry(0.0275, 14, 12), m.snow, [0, 0.1472, 0], null, [1, 0.88, 1]);
   // goggles pushed up onto the brim
-  add(headGroup, new THREE.TorusGeometry(0.0942, 0.0045, 8, 26), m.dark, [0, 0.0922, 0],
+  add(headGroup, new THREE.TorusGeometry(0.0946, 0.0045, 8, 26), m.dark, [0, 0.0742, 0],
     [Math.PI / 2, 0, 0], [1, 1, 1.04]);
   add(headGroup, new THREE.BoxGeometry(0.070, 0.020, 0.014), m.dark, [0, 0.0907, -0.0900], [-0.26, 0, 0]);
   for (const side of [-1, 1]) {
@@ -1426,23 +1434,30 @@ export function makeNameTag(name, colorIdx) {
 // ---------------------------------------------------------------------------
 // First-person viewmodel: gloved throwing hand + off hand
 // ---------------------------------------------------------------------------
-export function createViewModel() {
-  const m = materialsFor(0);
+export function createViewModel(look) {
+  const m = materialsFor(0, look);
+  // hands match the character you picked in the menu, so first person and the
+  // body you show everyone else are the same person
+  const j = look && Number.isInteger(look.j) ? look.j : 0;
+  const sIdx = look && Number.isInteger(look.s) ? look.s : 0;
   const sleeve = new THREE.MeshPhysicalMaterial({
-    color: 0x2b3f55, roughness: 0.84, metalness: 0,
+    color: new THREE.Color(JACKETS[j % JACKETS.length]).multiplyScalar(1.04),
+    roughness: 0.84, metalness: 0,
     bumpMap: fabricBump(), bumpScale: 0.9,
     sheen: 0.7, sheenRoughness: 0.7, sheenColor: new THREE.Color(0x9fb4c8),
     envMapIntensity: 0.55
   });
   const knit = new THREE.MeshPhysicalMaterial({
-    color: 0xb4482f, roughness: 0.94, metalness: 0,
+    color: SCARVES[sIdx % SCARVES.length], roughness: 0.94, metalness: 0,
     bumpMap: knitBump(), bumpScale: 1.5,
     sheen: 1, sheenRoughness: 0.9, sheenColor: new THREE.Color(0xffffff)
   });
   const glove = new THREE.MeshPhysicalMaterial({
-    color: 0x22272d, roughness: 0.6, metalness: 0.03,
+    color: 0x6b4a33, roughness: 0.74, metalness: 0,
     bumpMap: leatherBump(), bumpScale: 1.1,
-    clearcoat: 0.4, clearcoatRoughness: 0.5, envMapIntensity: 0.9
+    normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.45, 0.45),
+    sheen: 0.35, sheenRoughness: 0.7, sheenColor: new THREE.Color(0xa8805e),
+    clearcoat: 0.15, clearcoatRoughness: 0.6, envMapIntensity: 0.6
   });
   const snowMat = new THREE.MeshStandardMaterial({
     color: 0xf7fbff, roughness: 0.62, metalness: 0, envMapIntensity: 0.9
