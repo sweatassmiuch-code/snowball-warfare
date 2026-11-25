@@ -1,6 +1,6 @@
 # ❄ SNOWBALL WARFARE
 
-Hyperrealistischer Multiplayer-Schneeballshooter im Schneesturm.
+Stilisierter Multiplayer-Schneeballshooter im Schneesturm.
 **Ein Treffer – und du bist raus.**
 
 Ein komplett statisches Browser-Spiel: Three.js für die Optik, PeerJS/WebRTC für
@@ -16,6 +16,7 @@ läuft auf jedem Static-Host (Vercel, GitHub Pages, Netlify …).
 | **Ziel** | 15 Eliminierungen pro Runde |
 | **Treffer** | Ein Körpertreffer schaltet den Gegner aus |
 | **Wurf** | Linksklick halten lädt die Wucht auf, loslassen wirft – währenddessen friert die Welt ein (Zeitlupe) |
+| **Zielhilfe** | Beim Aufladen zeigt eine gepunktete Bahn samt Aufschlagring die echte Flugkurve (Schwerkraft, Luftwiderstand, Wind) |
 | **Respawn** | Automatisch nach 3,2 Sekunden |
 | **Karte** | Hügel, dichter Fichtenwald, Holzhütte, gefrorener See |
 | **Bots** | 0–5 KI-Gegner (Frost, Yeti, Eiswolf) füllen den Raum |
@@ -28,7 +29,7 @@ läuft auf jedem Static-Host (Vercel, GitHub Pages, Netlify …).
 | `Shift` | Sprinten |
 | `Space` | Springen |
 | `Maus` | Zielen |
-| `Linke Maustaste` | Schneeball aufladen (Welt friert ein) & werfen |
+| `Linke Maustaste` | Schneeball aufladen (Welt friert ein, Ziellinie erscheint) & werfen |
 | `Tab` | Rangliste |
 | `M` | Ton an/aus |
 | `F` | FPS-Anzeige (mit Render-Skalierung) |
@@ -136,6 +137,14 @@ snowball-war/
   Distanznebel, 7.500 Schneeflocken (GPU-Punkte) und glitzernde Eiskristalle.
 - **Physik:** parabelfliegende Schneebälle mit Sub-Stepping, Boden-/Objekt-/Körper-
   Kollision, Host-autoritativ mit Spawn-Schutz.
+- **Figuren:** prozedurale Stilisierung mit großem Kopf, klobigen Handschuhen und Stiefeln;
+  Kugelgelenke an Schulter, Ellbogen, Hüfte und Knie verhindern Lücken bei jeder Beugung.
+- **Animation:** gewichtsbasierter Lauf-Zyklus (Fersenkontakt → Abdruck → Abstoß), Becken-
+  und Oberkörper-Gegendrehung, Armpendel mit Ellbogenbeuge, Lean in Kurven, Blinzeln,
+  Atem-Idle mit gelegentlichem Blick, Wurf in Schlüsselposen (Ausholen → Schnapp → Nach-
+  schwingen) und Treffer-Flinch; alle Übergänge werden weich geblendet.
+- **Game Feel:** Zeitlupen-Freeze beim Aufladen, Ziellinie mit Aufschlagring, FOV-Kick,
+  Kamera-Recoil, Landestaub, Fußspuren und Atemwolken.
 - **Sound:** Wind, Schritte, Wurf, Einschläge und UI-Töne live per WebAudio synthetisiert.
 
 ---

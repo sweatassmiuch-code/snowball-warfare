@@ -657,6 +657,15 @@ function handleEvent(msg) {
     }
     effects.impact(msg.x, msg.y, msg.z, msg.k);
     audio.impact({ x: msg.x, y: msg.y, z: msg.z }, camera, msg.k);
+    if (msg.k === 'body') {
+      // whoever took the hit flinches
+      for (const [, r] of G.remotes) {
+        if (Math.hypot(r.root.position.x - msg.x, r.root.position.z - msg.z) < 1.5) {
+          r.ch.hit(1);
+          break;
+        }
+      }
+    }
     if (msg.k === 'body' && msg.own === G.selfId) {
       showHitmarker(false);
       audio.hitmarker();
@@ -1016,6 +1025,95 @@ function spawnProjectileVisual(id, o, v) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Aim arc: while the world is frozen for a throw, draw where the snowball will
+// actually go (gravity, drag and wind included) plus a landing ring.
+// ---------------------------------------------------------------------------
+const aim = (() => {
+  const N = 64;
+  const geo = new THREE.BufferGeometry();
+  const pts = new Float32Array(N * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+  // a dotted glow reads far better than a hairline in a snowstorm
+  const dotC = document.createElement('canvas');
+  dotC.width = dotC.height = 64;
+  const dctx = dotC.getContext('2d');
+  const dg = dctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  dg.addColorStop(0, 'rgba(255,255,255,1)');
+  dg.addColorStop(0.35, 'rgba(210,240,255,0.85)');
+  dg.addColorStop(1, 'rgba(180,225,255,0)');
+  dctx.fillStyle = dg;
+  dctx.fillRect(0, 0, 64, 64);
+  const dotTex = new THREE.CanvasTexture(dotC);
+  const mat = new THREE.PointsMaterial({
+    map: dotTex, color: 0xbfe9ff, size: 6.5, sizeAttenuation: false,
+    transparent: true, opacity: 0, depthWrite: false, alphaTest: 0.02,
+    blending: THREE.AdditiveBlending, fog: false
+  });
+  const line = new THREE.Points(geo, mat);
+  line.frustumCulled = false;
+  line.visible = false;
+  scene.add(line);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.26, 0.36, 40),
+    new THREE.MeshBasicMaterial({
+      color: 0xcdeeff, transparent: true, opacity: 0, depthWrite: false,
+      side: THREE.DoubleSide, fog: false, blending: THREE.AdditiveBlending
+    })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.visible = false;
+  scene.add(ring);
+
+  const p = new THREE.Vector3(), v = new THREE.Vector3(), dir = new THREE.Vector3();
+  let fade = 0;
+
+  function update(dt, charge) {
+    const targetFade = (charge > 0.10 && !G.dead && G.mode === 'playing') ? Math.min(1, (charge - 0.1) * 3.4) : 0;
+    fade += (targetFade - fade) * Math.min(1, dt * 16);
+    if (fade < 0.02) { line.visible = false; ring.visible = false; return; }
+
+    const power = Math.min(1, charge);
+    camera.updateMatrixWorld();
+    camera.getWorldDirection(dir);
+    p.copy(camera.position).addScaledVector(dir, 0.46);
+    p.y -= 0.10;
+    v.copy(dir).multiplyScalar(15 + power * 19);
+    v.x += WIND.x * 0.25;
+    v.z += WIND.z * 0.25;
+
+    const step = 0.032;
+    let n = 0;
+    for (let i = 0; i < N; i++) {
+      pts[i * 3] = p.x; pts[i * 3 + 1] = p.y; pts[i * 3 + 2] = p.z;
+      n = i;
+      v.y -= BALL.gravity * step;
+      const dragF = Math.max(0, 1 - BALL.drag * step);
+      v.x *= dragF; v.y *= dragF; v.z *= dragF;
+      v.x += WIND.x * step;
+      v.z += WIND.z * step;
+      p.addScaledVector(v, step);
+      const g = terrainHeight(p.x, p.z) + 0.06;
+      if (p.y <= g) { p.y = g; n = i + 1; break; }
+    }
+    for (let i = n + 1; i < N; i++) {
+      pts[i * 3] = p.x; pts[i * 3 + 1] = p.y; pts[i * 3 + 2] = p.z;
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.setDrawRange(0, Math.min(N, n + 2));
+    line.visible = true;
+    mat.opacity = 0.85 * fade;
+
+    ring.position.set(p.x, p.y + 0.04, p.z);
+    ring.visible = true;
+    ring.material.opacity = 0.45 * fade;
+    ring.scale.setScalar(1 + (1 - fade) * 0.5);
+  }
+
+  return { update };
+})();
+
 function updateProjectiles(dt) {
   for (const [id, pr] of G.projectiles) {
     pr.life += dt;
@@ -1233,6 +1331,7 @@ function updateLocalPlayer(dt, realDt = dt) {
     swayX, swayY, grounded: G.grounded
   });
   viewmodel.setVisible(!G.dead && G.mode !== 'menu');
+  aim.update(realDt, G.charging ? G.charge : 0);
 }
 
 // ---------------------------------------------------------------------------

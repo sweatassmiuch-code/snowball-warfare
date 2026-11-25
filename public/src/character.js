@@ -310,8 +310,9 @@ export function createCharacter(colorIdx) {
   neck.castShadow = false;
 
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 0.742, -0.01);
-  headGroup.scale.setScalar(1.06);
+  headGroup.position.set(0, 0.758, -0.01);
+  // exaggerated head size: instantly reads as a stylised character, not a mannequin
+  headGroup.scale.setScalar(1.18);
   hips.add(headGroup);
 
   // skull + jaw
@@ -340,18 +341,18 @@ export function createCharacter(colorIdx) {
   const lids = [];
   for (const side of [-1, 1]) {
     const ex = side * 0.041;
-    add(headGroup, new THREE.SphereGeometry(0.0215, 14, 12), m.skinShadow, [ex, 0.0198, -0.0900], null, [1.05, 0.8, 0.36]);
-    add(headGroup, new THREE.SphereGeometry(0.0150, 16, 14), m.eyeWhite, [ex, 0.0198, -0.0975], null, [1, 0.6, 0.52]);
-    add(headGroup, new THREE.SphereGeometry(0.0094, 14, 12), m.iris, [ex + side * 0.0014, 0.0188, -0.1068], null, [1, 1, 0.55]);
-    add(headGroup, new THREE.SphereGeometry(0.0042, 10, 8), m.pupil, [ex + side * 0.0014, 0.0186, -0.1096], null, [1, 1, 0.55]);
-    add(headGroup, new THREE.SphereGeometry(0.0026, 8, 6), m.eyeWhite, [ex + side * 0.0044, 0.0228, -0.1102], null, [1, 1, 0.6]);
+    add(headGroup, new THREE.SphereGeometry(0.0232, 14, 12), m.skinShadow, [ex, 0.0198, -0.0892], null, [1.06, 0.82, 0.36]);
+    add(headGroup, new THREE.SphereGeometry(0.0168, 16, 14), m.eyeWhite, [ex, 0.0198, -0.0978], null, [1, 0.66, 0.52]);
+    add(headGroup, new THREE.SphereGeometry(0.0106, 14, 12), m.iris, [ex + side * 0.0014, 0.0188, -0.1073], null, [1, 1, 0.55]);
+    add(headGroup, new THREE.SphereGeometry(0.0048, 10, 8), m.pupil, [ex + side * 0.0014, 0.0186, -0.1102], null, [1, 1, 0.55]);
+    add(headGroup, new THREE.SphereGeometry(0.0029, 8, 6), m.eyeWhite, [ex + side * 0.0048, 0.0234, -0.1110], null, [1, 1, 0.6]);
     // dark lash line dominates the upper edge so the eye reads almond-shaped
     add(headGroup, new THREE.BoxGeometry(0.026, 0.0018, 0.005), m.skinShadow, [ex, 0.0262, -0.1012], [0, 0, side * 0.07]);
     // upper lid with a hooded crease, lower lid and a soft lash line
-    const upperLid = add(headGroup, new THREE.SphereGeometry(0.0168, 14, 10), m.skin, [ex, 0.0286, -0.0950], [-0.24, 0, 0], [1.05, 0.56, 0.62]);
+    const upperLid = add(headGroup, new THREE.SphereGeometry(0.0186, 14, 10), m.skin, [ex, 0.0296, -0.0952], [-0.24, 0, 0], [1.05, 0.56, 0.62]);
     upperLid.userData.baseY = 0.56;
     lids.push(upperLid);
-    const lowerLid = add(headGroup, new THREE.SphereGeometry(0.0158, 12, 8), m.skin, [ex, 0.0118, -0.0955], [0.24, 0, 0], [1.02, 0.32, 0.55]);
+    const lowerLid = add(headGroup, new THREE.SphereGeometry(0.0174, 12, 8), m.skin, [ex, 0.0106, -0.0958], [0.24, 0, 0], [1.02, 0.32, 0.55]);
     lowerLid.userData.baseY = 0.32;
     lids.push(lowerLid);
     add(headGroup, new THREE.BoxGeometry(0.029, 0.0018, 0.005), m.skinShadow, [ex, 0.0242, -0.1018], [0, 0, side * 0.06]);
@@ -361,7 +362,9 @@ export function createCharacter(colorIdx) {
   // mouth: upper and lower lip with a soft, closed smile
   add(headGroup, new THREE.CapsuleGeometry(0.0072, 0.028, 3, 8), m.lip, [0, -0.0625, -0.0935], [0, 0, Math.PI / 2], [1, 1, 0.85]);
   add(headGroup, new THREE.CapsuleGeometry(0.0094, 0.024, 3, 8), m.lip, [0, -0.0748, -0.0915], [-0.06, 0, Math.PI / 2], [1, 1, 0.95]);
-  add(headGroup, new THREE.BoxGeometry(0.034, 0.0030, 0.006), m.lipDark, [0, -0.0682, -0.0940]);
+  // a curved mouth line reads as a smile instead of a flat slot
+  add(headGroup, new THREE.TorusGeometry(0.030, 0.0019, 6, 18, Math.PI * 0.55), m.lipDark,
+    [0, -0.0385, -0.0958], [0, 0, -Math.PI / 2 - Math.PI * 0.275]);
   for (const side of [-1, 1]) {
     add(headGroup, new THREE.SphereGeometry(0.0042, 6, 5), m.lip, [side * 0.0175, -0.0685, -0.0910], null, [1, 0.9, 0.7]);
   }
@@ -415,12 +418,14 @@ export function createCharacter(colorIdx) {
     const elbow = new THREE.Group();
     elbow.position.y = -0.30;
     shoulder.add(elbow);
+    add(elbow, new THREE.SphereGeometry(0.053, 12, 10), m.jacket, [0, 0, 0], null, [1, 1, 0.96]);
     add(elbow, new THREE.CapsuleGeometry(0.052, 0.168, 4, 14), m.jacket, [0, -0.135, 0], null, [1, 1, 0.94]);
     // knit cuff
     add(elbow, new THREE.CylinderGeometry(0.050, 0.055, 0.052, 14), m.scarf, [0, -0.245, 0]);
-    // glove
+    // glove: chunky cartoon mitt
     const hand = new THREE.Group();
     hand.position.y = -0.285;
+    hand.scale.setScalar(1.12);
     elbow.add(hand);
     add(hand, new THREE.CapsuleGeometry(0.030, 0.055, 4, 12), m.leather, [0, -0.035, -0.004], [0.1, 0, 0], [1.12, 1, 0.85]);
     add(hand, new THREE.SphereGeometry(0.032, 12, 10), m.leather, [0, 0.012, 0], null, [1.05, 0.8, 0.95]);
@@ -441,17 +446,19 @@ export function createCharacter(colorIdx) {
     const hip = new THREE.Group();
     hip.position.set(side * 0.098, -0.015, 0);
     hips.add(hip);
+    add(hip, new THREE.SphereGeometry(0.095, 14, 11), m.pants, [0, 0, 0], null, [1, 1, 0.98]);
     add(hip, new THREE.CapsuleGeometry(0.092, 0.235, 4, 12), m.pants, [0, -0.195, 0], null, [1, 1, 0.95]);
 
     const knee = new THREE.Group();
     knee.position.y = -0.415;
     hip.add(knee);
-    // knee reinforcement hides the joint seam and reads as fabric padding
-    add(knee, new THREE.SphereGeometry(0.080, 12, 8), m.pants, [0, 0.005, -0.006], null, [1, 0.62, 0.95]);
+    // a full joint ball keeps the knee sealed at any bend angle
+    add(knee, new THREE.SphereGeometry(0.086, 14, 11), m.pants, [0, 0.004, -0.004], null, [1, 0.96, 0.98]);
     add(knee, new THREE.CapsuleGeometry(0.075, 0.205, 4, 12), m.pants, [0, -0.155, 0], null, [1, 1, 0.94]);
-    // boot
+    // boot: oversized cartoon boot
     const foot = new THREE.Group();
     foot.position.y = -0.315;
+    foot.scale.setScalar(1.13);
     knee.add(foot);
     add(foot, new THREE.BoxGeometry(0.105, 0.095, 0.135), m.boot, [0, -0.035, -0.012]);
     add(foot, new THREE.BoxGeometry(0.098, 0.072, 0.115), m.boot, [0, -0.052, -0.105], [0.08, 0, 0]);
@@ -485,6 +492,11 @@ export function createCharacter(colorIdx) {
     throwT: 0,
     deadProgress: 0,
     deadSide: Math.random() < 0.5 ? -1 : 1,
+    moveBlend: 0,
+    yawPrev: 0,
+    turnVel: 0,
+    hitT: 0,
+    hitK: 1,
     heldBall,
     torsoGroup, headGroup,
     armR, armL, legR, legL,
@@ -493,6 +505,35 @@ export function createCharacter(colorIdx) {
 
   function triggerThrow() { state.throwT = 0.0001; }
   function setHeldBall(v) { heldBall.visible = !!v; }
+  // flinch when a snowball connects
+  function hit(strength = 1) {
+    state.hitT = 0.0001;
+    state.hitK = Math.min(1.5, Math.max(0.4, strength));
+  }
+
+  // Throw animation as key poses: coil away from the target, snap through,
+  // then overshoot and settle. Poses are blended instead of switched, so the
+  // motion keeps its weight at any frame rate.
+  const THROW_KEYS = [
+    { t: 0.00, ty: 0.00, tx: 0.00, rx: 0.00, rz: 0.00, re: -0.32, rw: 0.00, lx: 0.00, lz: 0.00, dip: 0.000 },
+    { t: 0.16, ty: -0.46, tx: -0.07, rx: 1.45, rz: 0.36, re: -1.75, rw: -0.58, lx: -0.42, lz: -0.20, dip: -0.040 },
+    { t: 0.33, ty: 0.36, tx: 0.18, rx: -2.10, rz: -0.12, re: -0.22, rw: 0.64, lx: 0.62, lz: 0.32, dip: 0.014 },
+    { t: 0.56, ty: 0.25, tx: 0.24, rx: -1.32, rz: -0.30, re: -0.54, rw: 0.30, lx: 0.34, lz: 0.42, dip: 0.008 },
+    { t: 1.00, ty: 0.00, tx: 0.00, rx: 0.00, rz: 0.00, re: -0.32, rw: 0.00, lx: 0.00, lz: 0.00, dip: 0.000 }
+  ];
+  const throwPose = { ty: 0, tx: 0, rx: 0, rz: 0, re: 0, rw: 0, lx: 0, lz: 0, dip: 0 };
+  function sampleThrow(t) {
+    let a = THROW_KEYS[0], b = THROW_KEYS[1];
+    for (let i = 0; i < THROW_KEYS.length - 1; i++) {
+      if (t >= THROW_KEYS[i].t && t <= THROW_KEYS[i + 1].t) { a = THROW_KEYS[i]; b = THROW_KEYS[i + 1]; break; }
+    }
+    let k = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
+    k = k * k * (3 - 2 * k);
+    for (const key of ['ty', 'tx', 'rx', 'rz', 're', 'rw', 'lx', 'lz', 'dip']) {
+      throwPose[key] = a[key] + (b[key] - a[key]) * k;
+    }
+    return throwPose;
+  }
 
   function update(dt, opts) {
     const { yaw = 0, pitch = 0, moving = false, sprinting = false, dead = false } = opts || {};
@@ -509,6 +550,21 @@ export function createCharacter(colorIdx) {
         if (state.blinkPhase >= 1) state.blinkPhase = 0;
       }
     }
+
+    // eased locomotion blend so walking in and out of a run never pops
+    const target = dead ? 0 : (moving ? (sprinting ? 1 : 0.58) : 0);
+    state.moveBlend += (target - state.moveBlend) * Math.min(1, dt * 8);
+    const amp = state.moveBlend;
+
+    // lean into turns
+    let dYaw = yaw - state.yawPrev;
+    while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+    while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+    state.yawPrev = yaw;
+    const turnVel = dt > 0.0001 ? dYaw / dt : 0;
+    state.turnVel += (turnVel - state.turnVel) * Math.min(1, dt * 6);
+    const lean = Math.max(-1, Math.min(1, state.turnVel * 0.10));
+
     root.rotation.y = yaw;
     headGroup.rotation.x = Math.max(-0.5, Math.min(0.5, pitch * 0.6));
 
@@ -533,88 +589,106 @@ export function createCharacter(colorIdx) {
       armL.elbow.rotation.x = -0.4;
       torsoGroup.rotation.y = ease * 0.25 * state.deadSide;
       headGroup.rotation.x = ease * 0.35;
+      headGroup.rotation.y = 0;
       return;
     }
 
     state.deadProgress = 0;
     root.rotation.x = 0;
     root.rotation.z = 0;
-    hips.position.y = 0.92;
 
-    const amp = moving ? (sprinting ? 1 : 0.7) : 0;
-    if (amp > 0.001) state.phase += dt * (sprinting ? 13.2 : 9.0);
-    else state.phase += dt * 1.4;
-    const swing = Math.sin(state.phase) * (sprinting ? 0.78 : 0.58) * amp;
+    // --- gait -------------------------------------------------------------
+    state.phase += dt * (sprinting ? 13.6 : 9.4) * Math.max(0.28, amp);
+    const sp = Math.sin(state.phase);
+    const cp = Math.cos(state.phase);
+    const stride = (0.60 + 0.20 * amp) * amp;
 
-    // legs with knee flexion on the backswing
-    legL.hip.rotation.x = swing;
-    legR.hip.rotation.x = -swing;
-    legL.knee.rotation.x = -Math.max(0, -Math.sin(state.phase + 0.5)) * (sprinting ? 1.25 : 0.95) * amp;
-    legR.knee.rotation.x = -Math.max(0, Math.sin(state.phase + 0.5)) * (sprinting ? 1.25 : 0.95) * amp;
-    legL.foot.rotation.x = Math.max(0, Math.sin(state.phase)) * 0.35 * amp;
-    legR.foot.rotation.x = Math.max(0, -Math.sin(state.phase)) * 0.35 * amp;
+    legL.hip.rotation.x = sp * stride;
+    legR.hip.rotation.x = -sp * stride;
+    // knees fold on the swing leg and straighten into the plant
+    const fold = (1.0 + 0.5 * amp) * amp;
+    legL.knee.rotation.x = -Math.max(0, -Math.sin(state.phase - 0.5)) * fold;
+    legR.knee.rotation.x = -Math.max(0, Math.sin(state.phase - 0.5)) * fold;
+    // heel strike, flat plant, toe off
+    legL.foot.rotation.x = (Math.max(0, cp) * 0.26 - Math.max(0, -cp) * 0.30) * amp;
+    legR.foot.rotation.x = (Math.max(0, -cp) * 0.26 - Math.max(0, cp) * 0.30) * amp;
 
-    // hips bob and counter-rotation
-    const bob = Math.abs(Math.sin(state.phase)) * 0.026 * amp;
-    hips.position.y = 0.92 + bob;
-    hips.rotation.y = swing * 0.10;
+    // hips: two bounces per stride, rolled towards the planted leg
+    hips.position.y = 0.92 + (0.5 - 0.5 * Math.cos(state.phase * 2)) * 0.032 * amp;
+    hips.rotation.y = sp * 0.13 * amp;
+    hips.rotation.z = sp * 0.045 * amp - lean * 0.10;
 
-    // torso twist + lean into the run
-    torsoGroup.rotation.y = -swing * 0.16;
-    torsoGroup.rotation.x = (moving ? 0.06 + (sprinting ? 0.07 : 0) : 0) + Math.sin(state.time * 1.6) * 0.006;
-    headGroup.rotation.y = swing * 0.10;
+    // torso counter-rotates against the hips and leans into the run
+    torsoGroup.rotation.y = -sp * 0.20 * amp;
+    torsoGroup.rotation.x = (0.05 + 0.10 * amp) * amp;
+    torsoGroup.rotation.z = -lean * 0.14;
+    torsoGroup.position.y = 0.02 + Math.sin(state.time * 1.7) * 0.004 * (1 - amp);
 
-    // arms counter-swing, elbows always slightly bent
-    const armAmp = moving ? (sprinting ? 1.15 : 0.8) : 0;
-    armL.shoulder.rotation.x = -swing * armAmp;
-    armR.shoulder.rotation.x = swing * armAmp;
-    armL.shoulder.rotation.z = -0.06 - Math.sin(state.phase) * 0.03 * armAmp;
-    armR.shoulder.rotation.z = 0.06 + Math.sin(state.phase) * 0.03 * armAmp;
-    armL.elbow.rotation.x = -0.32 - (sprinting ? 0.55 : 0.18) * armAmp;
-    armR.elbow.rotation.x = -0.32 - (sprinting ? 0.55 : 0.18) * armAmp;
+    // arms swing opposite the legs; elbows fold as they come forward
+    armL.shoulder.rotation.x = -sp * (0.50 + 0.60 * amp) * amp;
+    armR.shoulder.rotation.x = sp * (0.50 + 0.60 * amp) * amp;
+    armL.shoulder.rotation.z = -0.07 - 0.05 * amp;
+    armR.shoulder.rotation.z = 0.07 + 0.05 * amp;
+    armL.elbow.rotation.x = -0.30 - Math.max(0, -sp) * 0.90 * amp;
+    armR.elbow.rotation.x = -0.30 - Math.max(0, sp) * 0.90 * amp;
 
-    // idle breathing + weight shift
-    if (!moving) {
-      const breathe = Math.sin(state.time * 1.7);
-      torsoGroup.position.y = 0.02 + breathe * 0.004;
-      torsoGroup.rotation.z = Math.sin(state.time * 0.8) * 0.012;
-      armL.shoulder.rotation.x += breathe * 0.02;
-      armR.shoulder.rotation.x -= breathe * 0.02;
-    } else {
-      torsoGroup.position.y = 0.02;
-      torsoGroup.rotation.z = 0;
+    // idle: breathing, a slow weight shift and an occasional glance
+    const idle = 1 - Math.min(1, amp / 0.15);
+    if (idle > 0.001) {
+      const breathe = Math.sin(state.time * 1.7) * idle;
+      torsoGroup.position.y += breathe * 0.004;
+      torsoGroup.rotation.z += Math.sin(state.time * 0.7) * 0.014 * idle;
+      hips.position.y += breathe * 0.002;
+      armL.shoulder.rotation.x += -breathe * 0.03;
+      armR.shoulder.rotation.x += -breathe * 0.03;
+      armL.shoulder.rotation.z += breathe * 0.02;
+      armR.shoulder.rotation.z -= breathe * 0.02;
     }
+    const glance = Math.sin(state.time * 0.31) * Math.sin(state.time * 0.17 + 1.3);
+    headGroup.rotation.y = -sp * 0.06 * amp - lean * 0.10 + glance * 0.18 * idle;
+    headGroup.rotation.z = sp * 0.03 * amp + lean * 0.05;
 
-    // throw animation
+    // --- throw ------------------------------------------------------------
+    let throwing = false;
     if (state.throwT > 0) {
-      state.throwT += dt / 0.52;
-      const t = Math.min(1, state.throwT);
-      let angle, elbow, wrist;
-      if (t < 0.32) {
-        const k = t / 0.32;
-        angle = 1.05 * k; elbow = -0.32 - 1.15 * k; wrist = -0.2 * k;
-      } else if (t < 0.58) {
-        const k = (t - 0.32) / 0.26;
-        angle = 1.05 - 2.55 * k; elbow = -1.47 + 1.30 * k; wrist = -0.2 + 0.5 * k;
-      } else {
-        const k = (t - 0.58) / 0.42;
-        angle = -1.5 + 1.5 * k; elbow = -0.17 - 0.15 * k; wrist = 0.3 * (1 - k);
-      }
-      armR.shoulder.rotation.x = angle;
-      armR.shoulder.rotation.z = 0.06 + 0.22 * Math.sin(t * Math.PI);
-      armR.elbow.rotation.x = elbow;
-      armR.hand.rotation.x = wrist;
-      torsoGroup.rotation.y = 0.22 * Math.sin(t * Math.PI) - 0.16 * Math.max(0, (t - 0.5) / 0.5);
-      if (t >= 1) { state.throwT = 0; armR.hand.rotation.x = 0; }
+      state.throwT += dt / 0.60;
+      const p = sampleThrow(Math.min(1, state.throwT));
+      throwing = true;
+      torsoGroup.rotation.y = p.ty;
+      torsoGroup.rotation.x = p.tx;
+      torsoGroup.rotation.z = 0;
+      armR.shoulder.rotation.x = p.rx;
+      armR.shoulder.rotation.z = p.rz;
+      armR.elbow.rotation.x = p.re;
+      armR.hand.rotation.x = p.rw;
+      armL.shoulder.rotation.x = p.lx;
+      armL.shoulder.rotation.z = p.lz;
+      hips.position.y += p.dip;
+      hips.rotation.y = p.ty * 0.4;
+      if (state.throwT >= 1) { state.throwT = 0; armR.hand.rotation.x = 0; }
+    }
+    if (!throwing) armR.hand.rotation.x *= Math.max(0, 1 - dt * 14);
+
+    // --- hit flinch -------------------------------------------------------
+    if (state.hitT > 0) {
+      state.hitT += dt / 0.36;
+      const k = Math.sin(Math.min(1, state.hitT) * Math.PI) * state.hitK;
+      torsoGroup.rotation.x -= 0.38 * k;
+      torsoGroup.rotation.y += 0.22 * k;
+      headGroup.rotation.x -= 0.32 * k;
+      armL.shoulder.rotation.x -= 0.55 * k;
+      armR.shoulder.rotation.x -= 0.45 * k;
+      hips.position.y -= 0.03 * k;
+      if (state.hitT >= 1) state.hitT = 0;
     }
 
-    // scarf tail flutter
+    // scarf flutter follows speed, turns and the throw
     const flutter = Math.sin(state.time * 3.4) * 0.06 + Math.sin(state.time * 7.1) * 0.02;
-    state.scarfTail.rotation.x = -0.05 - (moving ? (sprinting ? 0.55 : 0.3) : 0) - flutter * (0.4 + amp);
-    state.scarfTail.rotation.z = flutter * 0.8;
+    state.scarfTail.rotation.x = -0.05 - (sprinting ? 0.55 : 0.32) * amp - flutter * (0.4 + amp) - lean * 0.15;
+    state.scarfTail.rotation.z = flutter * 0.8 + lean * 0.35;
   }
 
-  return { ...state, update, triggerThrow, setHeldBall };
+  return { ...state, update, triggerThrow, setHeldBall, hit };
 }
 
 // ---------------------------------------------------------------------------
@@ -784,29 +858,32 @@ export function createViewModel() {
     chargeTarget = charging;
     charge += (chargeTarget - charge) * Math.min(1, dt * 12);
 
-    bobPhase += dt * (sprinting ? 12 : 7.4) * Math.min(1, speed / 4);
+    bobPhase += dt * (sprinting ? 12.6 : 7.6) * Math.min(1, speed / 4);
     const bobAmt = Math.min(1, speed / 5.2);
-    const bobX = Math.sin(bobPhase) * 0.014 * bobAmt;
-    const bobY = Math.abs(Math.cos(bobPhase)) * 0.016 * bobAmt;
+    const bobX = Math.sin(bobPhase) * 0.019 * bobAmt;
+    const bobY = Math.abs(Math.cos(bobPhase)) * 0.021 * bobAmt;
+    const bobZ = Math.sin(bobPhase * 2) * 0.012 * bobAmt;
 
-    throwT = throwT > 0 ? throwT + dt / 0.46 : 0;
+    throwT = throwT > 0 ? throwT + dt / 0.44 : 0;
     if (throwT > 1) throwT = 0;
 
-    let throwX = 0, throwY = 0, throwZ = 0;
+    // wind-up, snap, then let the arm keep travelling past neutral
+    let throwX = 0, throwY = 0, throwZ = 0, throwRoll = 0, throwPitch = 0;
+    const ease = (a, b, k) => a + (b - a) * Math.min(1, Math.max(0, k * k * (3 - 2 * k)));
     if (throwT > 0) {
       const t = throwT;
-      if (t < 0.3) {
-        const k = t / 0.3;
-        throwZ = 0.20 * k; throwX = 0.11 * k;
-      } else if (t < 0.62) {
-        const k = 1 - (t - 0.3) / 0.32;
-        throwZ = 0.20 * k - 0.34 * (1 - k);
-        throwX = 0.11 * k;
-        throwY = 0.24 * (1 - k);
+      if (t < 0.22) {
+        const k = t / 0.22;
+        throwZ = ease(0, 0.10, k); throwY = ease(0, 0.05, k); throwPitch = ease(0, 0.38, k);
+      } else if (t < 0.45) {
+        const k = 1 - Math.pow(1 - (t - 0.22) / 0.23, 2.2);
+        throwZ = 0.10 - 0.44 * k; throwY = 0.05 + 0.27 * k;
+        throwX = 0.17 * k; throwRoll = -0.55 * k; throwPitch = 0.38 - 1.05 * k;
       } else {
-        const k = (t - 0.62) / 0.38;
-        throwZ = -0.34 * (1 - k);
-        throwY = 0.24 * (1 - k);
+        const k = (t - 0.45) / 0.55;
+        const e = k * k * (3 - 2 * k);
+        throwZ = -0.34 * (1 - e); throwY = 0.32 * (1 - e);
+        throwX = 0.17 * (1 - e); throwRoll = -0.55 * (1 - e); throwPitch = -0.67 * (1 - e);
       }
     }
 
@@ -817,12 +894,12 @@ export function createViewModel() {
     group.position.set(
       bobX + swayX * 0.0055 - chargePull * 0.32 - throwX + tremble,
       -bobY + swayY * 0.0048 + breathe + throwY - chargePull,
-      chargePull * 0.85 + throwZ
+      chargePull * 0.85 + throwZ + bobZ
     );
     group.rotation.set(
-      -swayY * 0.018 - charge * 0.045 + throwY * 0.38,
+      -swayY * 0.018 - charge * 0.045 + throwY * 0.38 + throwPitch,
       swayX * 0.028,
-      charge * 0.11 + throwX * 0.75
+      charge * 0.11 + throwX * 0.75 + throwRoll
     );
 
     if (!grounded) {
@@ -836,9 +913,11 @@ export function createViewModel() {
     const curl = 1.15 - charge * 0.25 + openAmount * 0.75;
     for (const f of fingers) f.rotation.x = curl;
 
-    ball.visible = !(throwT > 0.28 && throwT < 0.8);
+    ball.visible = !(throwT > 0.26 && throwT < 0.82);
     const s = 0.62 + charge * 0.46;
-    ball.scale.setScalar(s);
+    // squeeze the snow as the grip tightens, stretch it on release
+    const stretch = throwT > 0.26 && throwT < 0.5 ? (1 - (throwT - 0.26) / 0.24) * 0.10 : 0;
+    ball.scale.set(s * (1 - charge * 0.04 - stretch * 0.3), s * (1 + charge * 0.06 + stretch), s * (1 - charge * 0.04));
     ball.position.z = -0.115 - charge * 0.03;
     ball.position.y = 0.055 - charge * 0.012;
     ball.rotation.set(charge * 2.6, charge * 1.7, 0);
@@ -851,8 +930,11 @@ export function createViewModel() {
       -0.82 + charge * 0.045
     );
 
-    left.rotation.z = -0.30 + Math.sin(bobPhase * 0.5) * 0.02 * bobAmt;
-    left.position.y = -0.62 + bobY * 0.4;
+    // off hand braces slightly during the wind-up, drops away on release
+    left.rotation.z = -0.30 + Math.sin(bobPhase * 0.5) * 0.02 * bobAmt + charge * 0.14;
+    left.rotation.x = -0.42 + charge * 0.10 - (throwT > 0.2 ? 0.18 * Math.sin(Math.min(1, throwT) * Math.PI) : 0);
+    left.position.y = -0.62 + bobY * 0.4 + charge * 0.035;
+    left.position.x = -0.60 + charge * 0.025;
   }
 
   function setVisible(v) { group.visible = v; }
