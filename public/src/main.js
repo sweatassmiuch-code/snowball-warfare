@@ -6,7 +6,7 @@ import {
 import { createWorld } from './scene.js';
 import { createEffects } from './fx.js';
 import { createAudio } from './audio.js';
-import { createCharacter, makeNameTag, createViewModel, characterColor } from './character.js';
+import { createCharacter, makeNameTag, createViewModel, characterColor, LOOK_PALETTES } from './character.js';
 import { hostGame, joinGame } from './net.js';
 
 // ---------------------------------------------------------------------------
@@ -29,13 +29,17 @@ const ui = {
   matchBanner: $('matchBanner'), matchText: $('matchText'), matchSub: $('matchSub'),
   muteBtn: $('muteBtn'), menuBtn: $('menuBtn'), toast: $('toast'), copyCode: $('copyCode'),
   roomChip: $('roomChip'), staminaFill: $('staminaFill'), staminaWrap: $('staminaWrap'),
-  perfChip: $('perfChip'), fpsVal: $('fpsVal'), fpsScale: $('fpsScale')
+  perfChip: $('perfChip'), fpsVal: $('fpsVal'), fpsScale: $('fpsScale'),
+  preview: $('preview'), lookSummary: $('lookSummary'), randomLook: $('randomLook'),
+  fpsToggle: $('fpsToggle'), swJacket: $('swJacket'), swScarf: $('swScarf'),
+  swHat: $('swHat'), swSkin: $('swSkin'), tabs: [...document.querySelectorAll('.menu-v2 .tab')],
+  panes: [...document.querySelectorAll('.menu-v2 .pane')]
 };
 
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
-const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3, showFps: false };
+const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3, showFps: false, look: { j: 0, s: 0, k: 3, h: 0 } };
 let settings = { ...defaults };
 try {
   settings = { ...defaults, ...JSON.parse(localStorage.getItem('sbw.settings') || '{}') };
@@ -51,6 +55,8 @@ ui.botsSel.value = String(settings.bots);
 ui.sensVal.textContent = Number(settings.sens).toFixed(2);
 ui.volVal.textContent = Math.round(settings.vol * 100) + '%';
 ui.perfChip.classList.toggle('hidden', !settings.showFps);
+settings.look = { ...defaults.look, ...(settings.look || {}) };
+ui.fpsToggle.checked = !!settings.showFps;
 
 // ---------------------------------------------------------------------------
 // Renderer
@@ -463,6 +469,196 @@ function setLoading(on, text = 'Verbinde …') {
   ui.joinBtn.disabled = on;
 }
 
+
+// ---------------------------------------------------------------------------
+// Palette swatches + live character preview
+// ---------------------------------------------------------------------------
+const LOOK_SLOTS = [
+  { key: 'j', box: ui.swJacket, list: LOOK_PALETTES.jacket },
+  { key: 's', box: ui.swScarf, list: LOOK_PALETTES.scarf },
+  { key: 'h', box: ui.swHat, list: LOOK_PALETTES.hat },
+  { key: 'k', box: ui.swSkin, list: LOOK_PALETTES.skin }
+];
+
+function lookSummary() {
+  const j = LOOK_PALETTES.names.jacket[settings.look.j % LOOK_PALETTES.jacket.length] || 'Jacke';
+  const s = LOOK_PALETTES.names.scarf[settings.look.s % LOOK_PALETTES.scarf.length] || 'Schal';
+  const k = LOOK_PALETTES.names.skin[settings.look.k % LOOK_PALETTES.skin.length] || 'Haut';
+  return `${j} · ${s} · ${k}`;
+}
+
+function paintSwatches() {
+  for (const slot of LOOK_SLOTS) {
+    if (!slot.box) continue;
+    [...slot.box.children].forEach((b, i) => b.classList.toggle('is-on', settings.look[slot.key] === i));
+  }
+  if (ui.lookSummary) ui.lookSummary.textContent = lookSummary();
+}
+
+function buildSwatches() {
+  for (const slot of LOOK_SLOTS) {
+    if (!slot.box) continue;
+    slot.box.innerHTML = '';
+    slot.list.forEach((color, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.style.background = '#' + new THREE.Color(color).getHexString();
+      b.title = slot.key.toUpperCase() + ' ' + (i + 1);
+      b.addEventListener('click', () => {
+        if (settings.look[slot.key] === i) return;
+        settings.look[slot.key] = i;
+        saveSettings();
+        paintSwatches();
+        preview.refresh();
+      });
+      slot.box.appendChild(b);
+    });
+  }
+  paintSwatches();
+}
+
+const preview = (() => {
+  const canvas = ui.preview;
+  if (!canvas) return { refresh() {}, show() {}, hide() {} };
+  let renderer = null, scene = null, camera = null, ch = null;
+  let raf = 0, last = 0, running = false, clock = 0;
+
+  function ensure() {
+    if (renderer) return;
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(30, 1, 0.05, 20);
+    camera.position.set(0, 1.04, 4.05);
+    camera.lookAt(0, 0.95, 0);
+
+    scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a3742, 1.9));
+    const key = new THREE.DirectionalLight(0xfff3e4, 2.5);
+    key.position.set(-1.8, 2.6, 2.6);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0x9fd2ff, 2.0);
+    rim.position.set(2.4, 1.9, -2.4);
+    scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xffd9c2, 0.9);
+    fill.position.set(2.2, 0.6, 1.8);
+    scene.add(fill);
+
+    const disc = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.52, 0.58, 0.05, 44),
+      new THREE.MeshStandardMaterial({ color: 0x16283a, roughness: 0.55, metalness: 0.1 })
+    );
+    disc.position.y = -0.025;
+    scene.add(disc);
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(0.6, 0.66, 48),
+      new THREE.MeshBasicMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+    );
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = 0.002;
+    scene.add(halo);
+  }
+
+  function build() {
+    if (!scene) return;
+    if (ch) scene.remove(ch.root);
+    ch = createCharacter(characterColor(settings.name || 'du'), settings.look);
+    ch.root.position.set(0, 0, 0);
+    scene.add(ch.root);
+    pose(0);
+  }
+
+  function pose(dt) {
+    if (!ch) return;
+    // the character owns its root yaw, so the turn goes through update() --
+    // that keeps the idle lean and turn smoothing in one place
+    ch.update(dt, { speed: 0, grounded: true, yaw: Math.PI + Math.sin(clock * 0.55) * 0.40 });
+  }
+
+  function resize() {
+    if (!renderer) return;
+    const w = Math.max(1, canvas.clientWidth), h = Math.max(1, canvas.clientHeight);
+    if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+  }
+
+  function frame(t) {
+    if (!running) return;
+    raf = requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (t - last) / 1000 || 0.016);
+    last = t;
+    clock += dt;
+    resize();
+    pose(dt);
+    renderer.render(scene, camera);
+  }
+
+  return {
+    refresh() { ensure(); build(); },
+    show() {
+      ensure();
+      if (!ch) build();
+      if (running) return;
+      running = true;
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+    },
+    hide() {
+      running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    }
+  };
+})();
+
+ui.randomLook?.addEventListener('click', () => {
+  const pick = (n) => Math.floor(Math.random() * n);
+  settings.look = {
+    j: pick(LOOK_PALETTES.jacket.length),
+    s: pick(LOOK_PALETTES.scarf.length),
+    k: pick(LOOK_PALETTES.skin.length),
+    h: pick(LOOK_PALETTES.hat.length)
+  };
+  saveSettings();
+  paintSwatches();
+  preview.refresh();
+});
+
+for (const tab of ui.tabs) {
+  tab.addEventListener('click', () => {
+    const name = tab.dataset.tab;
+    for (const t of ui.tabs) t.classList.toggle('is-on', t === tab);
+    for (const pane of ui.panes) pane.classList.toggle('is-on', pane.dataset.pane === name);
+    if (name === 'look') preview.show();
+  });
+}
+
+ui.fpsToggle?.addEventListener('change', () => {
+  settings.showFps = ui.fpsToggle.checked;
+  saveSettings();
+  ui.perfChip.classList.toggle('hidden', !settings.showFps);
+});
+
+buildSwatches();
+preview.refresh();
+
+// The menu is toggled by class in several places, so follow the class instead
+// of sprinkling show/hide calls through the session code.
+if (ui.menu) {
+  new MutationObserver(() => {
+    if (ui.menu.classList.contains('hidden')) preview.hide();
+    else preview.show();
+  }).observe(ui.menu, { attributes: true, attributeFilter: ['class'] });
+}
+preview.show();
+
 ui.hostBtn.addEventListener('click', async () => {
   audio.init();
   audio.setVolume(settings.vol);
@@ -475,6 +671,7 @@ ui.hostBtn.addEventListener('click', async () => {
     const session = hostGame({
       name,
       bots: settings.bots,
+      look: settings.look,
       onState: handleState,
       onEvent: handleEvent,
       onRoster: handleRoster,
@@ -519,6 +716,7 @@ ui.joinBtn.addEventListener('click', async () => {
     const session = joinGame({
       code,
       name,
+      look: settings.look,
       onState: handleState,
       onEvent: handleEvent,
       onRoster: handleRoster,
@@ -620,7 +818,7 @@ function updateRemote(id, p) {
   let r = G.remotes.get(id);
   if (!r) {
     const info = G.roster.get(id) || { name: 'Spieler', bot: false };
-    const ch = createCharacter(characterColor(id));
+    const ch = createCharacter(characterColor(id), info.look);
     const tag = makeNameTag(info.name, characterColor(id));
     ch.root.add(tag);
     scene.add(ch.root);

@@ -78,8 +78,9 @@ function friendly(err) {
 // Host
 // ---------------------------------------------------------------------------
 export class HostSession {
-  constructor({ name, bots = 3, onState, onEvent, onRoster, onError, onClosed }) {
+  constructor({ name, bots = 3, look = null, onState, onEvent, onRoster, onError, onClosed }) {
     this.isHost = true;
+    this.look = look;
     this.selfId = 'host';
     this.handlers = { onState, onEvent, onRoster, onError, onClosed };
     this.connections = new Map();
@@ -89,7 +90,7 @@ export class HostSession {
     this.lastState = 0;
 
     this.sim = new GameSim({ botCount: bots, onEvent: (msg) => this.handleSimEvent(msg) });
-    this.sim.addPlayer('host', name);
+    this.sim.addPlayer('host', name, look);
     this.handlers.onRoster?.(this.sim.roster());
   }
 
@@ -129,9 +130,10 @@ export class HostSession {
     }
 
     const name = String(conn.metadata?.name || 'Gast').slice(0, 14) || 'Gast';
+    const look = conn.metadata?.look || null;
     conn.on('open', () => {
       this.connections.set(conn.peer, conn);
-      this.sim.addPlayer(conn.peer, name);
+      this.sim.addPlayer(conn.peer, name, look);
       try {
         conn.send({
           t: 'welcome',
@@ -213,7 +215,8 @@ export class HostSession {
 // Guest
 // ---------------------------------------------------------------------------
 export class GuestSession {
-  constructor({ code, name, onState, onEvent, onRoster, onError, onClosed, onReady }) {
+  constructor({ code, name, look = null, onState, onEvent, onRoster, onError, onClosed, onReady }) {
+    this.look = look;
     this.isHost = false;
     this.selfId = null;
     this.code = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
@@ -238,7 +241,7 @@ export class GuestSession {
 
     const conn = this.peer.connect('sbw-' + this.code, {
       reliable: true,
-      metadata: { name: this.name }
+      metadata: { name: this.name, look: this.look }
     });
     this.conn = conn;
 

@@ -15,6 +15,14 @@ const BOT_DEFS = [
   { name: 'Eiswolf', skill: 0.81, style: 'skirmisher', range: [12, 22], cadence: [1800, 2900], speed: 4.7 }
 ];
 
+// Palette slots are small integers; everything else is rejected so a peer
+// cannot smuggle junk through the roster.
+export function sanitizeLook(look) {
+  if (!look || typeof look !== 'object') return null;
+  const clamp = (v, n) => (Number.isFinite(v) ? ((Math.trunc(v) % n) + n) % n : 0);
+  return { j: clamp(look.j, 8), s: clamp(look.s, 6), k: clamp(look.k, 6), h: clamp(look.h, 6) };
+}
+
 export class GameSim {
   constructor({ botCount = 3, onEvent = () => {} } = {}) {
     this.players = new Map();
@@ -54,13 +62,14 @@ export class GameSim {
     return p;
   }
 
-  addPlayer(id, name) {
+  addPlayer(id, name, look) {
     const clean = String(name || 'Gast').replace(/[^\w\u00c0-\u024f .-]/g, '').trim().slice(0, 14) || 'Gast';
     const spawn = pickSpawn(this.players.values(), id);
     const p = makePlayerState(id, clean, false, spawn);
     p.spawnProtect = Date.now() + 2000;
+    p.look = sanitizeLook(look);
     this.players.set(id, p);
-    this.emit({ t: 'join', id, name: clean, bot: false });
+    this.emit({ t: 'join', id, name: clean, bot: false, look: p.look });
     return p;
   }
 
@@ -379,7 +388,7 @@ export class GameSim {
   }
 
   roster() {
-    return [...this.players.values()].map(p => ({ id: p.id, name: p.name, bot: p.bot }));
+    return [...this.players.values()].map(p => ({ id: p.id, name: p.name, bot: p.bot, look: p.look || null }));
   }
 
   snapshot() {

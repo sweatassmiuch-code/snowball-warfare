@@ -10,6 +10,18 @@ const SCARVES = [0xb4452f, 0xd8b24a, 0x4a7d8c, 0x9c3f4f, 0x6f8f4a, 0xc26a2c];
 const SKIN_TONES = [0xd9b49a, 0xc19a7e, 0xa87e62, 0xe4c6ac, 0x8c654c, 0xcbab92];
 const HAIR_COLORS = [0x1b1310, 0x3a2718, 0x6b4f2c, 0x120e0b, 0x53341f, 0x8a6a44];
 const IRIS_COLORS = [0x5d7f72, 0x5b7f96, 0x6f8a5a, 0x7d5a48, 0x4d5f78, 0x8a6a3c];
+// Hats get their own rack: knit colours that read apart from the scarf.
+const HAT_COLORS = [0xa8402f, 0xd9a441, 0x33506e, 0x2f5d4a, 0xb6bcc6, 0x4a3552];
+
+export const LOOK_PALETTES = {
+  jacket: JACKETS, scarf: SCARVES, hat: HAT_COLORS, skin: SKIN_TONES,
+  names: {
+    jacket: ['Marine', 'Weinrot', 'Wald', 'Cognac', 'Indigo', 'Brand', 'Petrol', 'Pflaume'],
+    scarf: ['Rot', 'Senf', 'Petrol', 'Bordeaux', 'Oliv', 'Orange'],
+    hat: ['Rot', 'Senf', 'Blau', 'Gruen', 'Grau', 'Pflaume'],
+    skin: ['Hell', 'Warm', 'Dunkel', 'Creme', 'Tief', 'Sand']
+  }
+};
 
 export function characterColor(id) {
   let h = 0;
@@ -602,11 +614,18 @@ const skinNormal = () => normalTexture('skin', 128, skinH, 1.1);
 // ---------------------------------------------------------------------------
 const matCache = new Map();
 
-function materialsFor(idx) {
-  if (matCache.has(idx)) return matCache.get(idx);
-  const jacketColor = JACKETS[idx % JACKETS.length];
-  const scarfColor = SCARVES[idx % SCARVES.length];
-  const skinColor = SKIN_TONES[idx % SKIN_TONES.length];
+function materialsFor(idx, look) {
+  // a look overrides single palette slots; anything omitted falls back to the
+  // hash index, so old call sites and bots keep working untouched
+  const j = look && Number.isInteger(look.j) ? look.j : idx;
+  const s = look && Number.isInteger(look.s) ? look.s : idx;
+  const k = look && Number.isInteger(look.k) ? look.k : idx;
+  const h = look && Number.isInteger(look.h) ? look.h : idx;
+  const key = `${j % JACKETS.length}:${s % SCARVES.length}:${k % SKIN_TONES.length}:${h % HAIR_COLORS.length}`;
+  if (matCache.has(key)) return matCache.get(key);
+  const jacketColor = JACKETS[j % JACKETS.length];
+  const scarfColor = SCARVES[s % SCARVES.length];
+  const skinColor = SKIN_TONES[k % SKIN_TONES.length];
   const hairColor = HAIR_COLORS[idx % HAIR_COLORS.length];
 
   const m = {
@@ -631,7 +650,7 @@ function materialsFor(idx) {
       sheen: 0.42, sheenRoughness: 0.9, sheenColor: new THREE.Color(0xd6dee6), envMapIntensity: 0.3
     }),
     beanie: new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(scarfColor).multiplyScalar(0.86),
+      color: new THREE.Color(HAT_COLORS[h % HAT_COLORS.length]).multiplyScalar(0.94),
       roughness: 0.98, metalness: 0,
       normalMap: knitNormal(), normalScale: new THREE.Vector2(0.9, 0.9),
       sheen: 0.36, sheenRoughness: 0.92, sheenColor: new THREE.Color(0xd6dee6), envMapIntensity: 0.26
@@ -646,18 +665,18 @@ function materialsFor(idx) {
     // the sculpted head carries its own albedo; decals add eyes and mouth
     face: new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(skinColor).multiplyScalar(0.98), roughness: 0.6, metalness: 0,
-      map: faceAlbedo(idx),
+      map: faceAlbedo(k),
       normalMap: skinNormal(), normalScale: new THREE.Vector2(0.09, 0.09),
       sheen: 0.16, sheenRoughness: 0.82, sheenColor: new THREE.Color(0xf3bcab),
       envMapIntensity: 0.3
     }),
     eyeOpen: new THREE.MeshPhysicalMaterial({
-      map: eyeTexture(idx, true), transparent: true, roughness: 0.25, metalness: 0,
+      map: eyeTexture(k, true), transparent: true, roughness: 0.25, metalness: 0,
       clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 0.9,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
     }),
     eyeClosed: new THREE.MeshStandardMaterial({
-      map: eyeTexture(idx, false), transparent: true, roughness: 0.6, metalness: 0,
+      map: eyeTexture(k, false), transparent: true, roughness: 0.6, metalness: 0,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
     }),
     mouth: new THREE.MeshStandardMaterial({
@@ -673,7 +692,7 @@ function materialsFor(idx) {
       roughness: 0.6, metalness: 0, envMapIntensity: 0.3
     }),
     brow: new THREE.MeshStandardMaterial({
-      color: new THREE.Color(HAIR_COLORS[idx % HAIR_COLORS.length]).offsetHSL(0, 0.10, 0.15),
+      color: new THREE.Color(hairColor).offsetHSL(0, 0.10, 0.15),
       roughness: 0.85, metalness: 0
     }),
     hair: new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.85, metalness: 0 }),
@@ -706,7 +725,7 @@ function materialsFor(idx) {
     lip: new THREE.MeshStandardMaterial({ color: new THREE.Color(skinColor).lerp(new THREE.Color(0x7a332c), 0.82), roughness: 0.48 }),
     lipDark: new THREE.MeshStandardMaterial({ color: 0x5c2a26, roughness: 0.55 })
   };
-  matCache.set(idx, m);
+  matCache.set(key, m);
   return m;
 }
 
@@ -862,8 +881,8 @@ const legRadius = (t) => {
 // ---------------------------------------------------------------------------
 // Character
 // ---------------------------------------------------------------------------
-export function createCharacter(colorIdx) {
-  const m = materialsFor(colorIdx);
+export function createCharacter(colorIdx, look) {
+  const m = materialsFor(colorIdx, look);
 
   const root = new THREE.Group();
   root.rotation.order = 'YXZ';
@@ -893,9 +912,27 @@ export function createCharacter(colorIdx) {
   const belt = add(torsoGroup, new THREE.CylinderGeometry(1, 1, 1, 28, 1, true), m.leather, [0, 0.078, 0], null, [0.171, 0.05, 0.123]);
   belt.castShadow = false;
 
-  // zip
-  add(torsoGroup, new THREE.BoxGeometry(0.012, 0.52, 0.012), m.metal, [0, 0.30, -0.163]);
-  add(torsoGroup, new THREE.BoxGeometry(0.022, 0.028, 0.014), m.metal, [0, 0.44, -0.172]);
+  // zip: sampled along the shell profile so the tape hugs the chest instead of
+  // cutting a straight box through the curve
+  const zipPts = [];
+  for (let i = 0; i <= 12; i++) {
+    const y = -0.064 + (0.588 + 0.064) * (i / 12);
+    let d = jacketSections[jacketSections.length - 1][2];
+    for (let k = 1; k < jacketSections.length; k++) {
+      const a = jacketSections[k - 1], b = jacketSections[k];
+      if (y >= a[0] && y <= b[0]) {
+        const t = (y - a[0]) / (b[0] - a[0] || 1);
+        d = a[2] + (b[2] - a[2]) * t;
+        break;
+      }
+      if (y < jacketSections[0][0]) { d = jacketSections[0][2]; break; }
+    }
+    zipPts.push(new THREE.Vector3(0, y, -(d + 0.0032)));
+  }
+  add(torsoGroup, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(zipPts), 34, 0.0032, 6, false), m.metal);
+  const zipTop = zipPts[zipPts.length - 1];
+  add(torsoGroup, new THREE.BoxGeometry(0.015, 0.022, 0.009), m.metal, [0, 0.572, zipTop.z - 0.003]);
+  add(torsoGroup, new THREE.BoxGeometry(0.009, 0.030, 0.005), m.leather, [0, 0.549, zipTop.z - 0.006], [0.12, 0, 0]);
   // hood bunched behind the neck: flat, wide, sitting on the shoulders
   const hood = add(torsoGroup, new THREE.SphereGeometry(1, 18, 12), m.jacket, [0, 0.512, 0.108], [0.22, 0, 0], [0.155, 0.085, 0.105]);
   hood.receiveShadow = true;
@@ -968,12 +1005,12 @@ export function createCharacter(colorIdx) {
   // One lathed profile: rolled brim, soft fold and a dome that clears the
   // skull by a few millimetres at every height.
   const hatProfile = [
-    [0.0900, 0.0612], [0.0924, 0.0634], [0.0932, 0.0694], [0.0920, 0.0787],
-    [0.0898, 0.0834], [0.0882, 0.0932], [0.0806, 0.1132], [0.0648, 0.1312],
-    [0.0402, 0.1352], [0.0180, 0.1390], [0.0002, 0.1400]
+    [0.0896, 0.0576], [0.0930, 0.0602], [0.0942, 0.0690], [0.0932, 0.0792],
+    [0.0902, 0.0850], [0.0888, 0.0962], [0.0850, 0.1148], [0.0742, 0.1352],
+    [0.0540, 0.1478], [0.0290, 0.1540], [0.0002, 0.1554]
   ].map((p) => new THREE.Vector2(p[0], p[1]));
   add(headGroup, new THREE.LatheGeometry(hatProfile, 34), m.beanie, [0, 0, 0]);
-  add(headGroup, new THREE.SphereGeometry(0.0265, 14, 12), m.snow, [0, 0.1382, 0], null, [1, 0.9, 1]);
+  add(headGroup, new THREE.SphereGeometry(0.0275, 14, 12), m.snow, [0, 0.1530, 0], null, [1, 0.88, 1]);
   // goggles pushed up onto the brim
   add(headGroup, new THREE.TorusGeometry(0.0942, 0.0045, 8, 26), m.dark, [0, 0.0922, 0],
     [Math.PI / 2, 0, 0], [1, 1, 1.04]);
@@ -1017,8 +1054,8 @@ export function createCharacter(colorIdx) {
     upper.castShadow = true; upper.receiveShadow = true;
     shoulder.add(upper);
     // shoulder of the jacket: a soft cap that carries the sleeve into the body
-    const deltoid = add(shoulder, new THREE.SphereGeometry(1, 18, 14), m.jacket,
-      [side * -0.004, -0.004, 0], [0, 0, side * 0.18], [0.066, 0.072, 0.068]);
+    const deltoid = add(shoulder, new THREE.SphereGeometry(1, 20, 16), m.jacket,
+      [side * -0.010, -0.014, 0], [0, 0, side * 0.13], [0.074, 0.061, 0.070]);
 
     const elbow = new THREE.Group();
     elbow.position.y = -0.30;
@@ -1035,13 +1072,14 @@ export function createCharacter(colorIdx) {
     elbow.add(fore);
     // a stitched crease reads as folded fabric instead of a joint
     add(elbow, new THREE.TorusGeometry(0.0555, 0.006, 6, 18), m.jacketDark, [0, 0.012, 0], [Math.PI / 2, 0, 0]);
-    // knit cuff
-    add(elbow, new THREE.CylinderGeometry(0.050, 0.055, 0.052, 14), m.scarf, [0, -0.245, 0]);
+    // knit cuff in jacket tone: the scarf colour turned the hands into rubber
+    // gloves, and a dark cuff frames the mitten instead
+    add(elbow, new THREE.CylinderGeometry(0.050, 0.056, 0.052, 16), m.jacketDark, [0, -0.245, 0]);
     // mitten: one soft palm, a thumb and a knit cuff — cleaner than four fingers
     const hand = new THREE.Group();
     hand.position.y = -0.285;
     elbow.add(hand);
-    add(hand, new THREE.CylinderGeometry(0.043, 0.048, 0.034, 18), m.scarf, [0, 0.006, 0]);
+    add(hand, new THREE.CylinderGeometry(0.043, 0.048, 0.030, 18), m.jacketDark, [0, 0.004, 0]);
     add(hand, new THREE.SphereGeometry(1, 18, 14), m.mitten, [0, -0.055, -0.008], [0.08, 0, 0], [0.055, 0.074, 0.043]);
     add(hand, new THREE.SphereGeometry(1, 12, 10), m.mitten, [0, -0.116, -0.006], null, [0.036, 0.024, 0.036]);
     add(hand, new THREE.CapsuleGeometry(0.0170, 0.034, 4, 10), m.mitten,

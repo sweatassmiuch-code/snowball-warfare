@@ -62,100 +62,135 @@
 </div>
 
 <!-- ===================== START MENU ===================== -->
-<div id="menu" class="fullscreen">
+<div id="menu" class="fullscreen menu-v2">
   <div class="menu-bg"></div>
-  <div class="menu-inner">
-    <div class="brand">
-      <div class="brand-mark">❄</div>
-      <h1>SNOWBALL<span>WARFARE</span></h1>
-      <p class="tagline">Hyperrealistischer Schneeball-Krieg. Ein Treffer – und du bist raus.</p>
-    </div>
 
-    <div class="menu-columns">
-      <section class="panel info-panel">
-        <h2>EINSATZBRIEFING</h2>
-        <ul class="brief">
-          <li><b>Ziel</b><span>15 Eliminierungen pro Runde</span></li>
-          <li><b>Treffer</b><span>Ein Körpertreffer schaltet aus</span></li>
-          <li><b>Wurf</b><span>Linksklick halten = mehr Wucht</span></li>
-          <li><b>Gelände</b><span>Hügel, Wald, Hütte &amp; Eissee</span></li>
-          <li><b>Wind</b><span>Seitenwind trägt deine Würfe</span></li>
-        </ul>
-        <div class="controls">
-          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Bewegen</span></div>
-          <div><kbd>SHIFT</kbd><span>Sprinten (Ausdauer)</span></div>
-          <div><kbd>SPACE</kbd><span>Springen</span></div>
-          <div><kbd>MAUS</kbd><span>Zielen</span></div>
-          <div><kbd>LMB</kbd><span>Werfen (halten)</span></div>
-          <div><kbd>TAB</kbd><span>Rangliste</span></div>
-          <div><kbd>M</kbd><span>Ton aus/an</span></div>
-          <div><kbd>F</kbd><span>FPS-Anzeige</span></div>
-          <div><kbd>ESC</kbd><span>Pause</span></div>
+  <div class="menu-shell">
+    <header class="menu-head">
+      <div class="brand-row">
+        <div class="brand-mark">&#10052;</div>
+        <div class="brand-text">
+          <h1>SNOWBALL<span>WARFARE</span></h1>
+          <p class="tagline">Ein Treffer &ndash; und du bist raus.</p>
         </div>
-        <p class="small-note">Bots kämpfen automatisch mit. Teile den Raumcode, um Freunde einzuladen.</p>
+      </div>
+      <div class="head-meta">
+        <span class="pill"><i class="dot-live"></i> P2P &middot; OHNE ACCOUNT</span>
+        <span class="pill">v1.1</span>
+      </div>
+    </header>
+
+    <div class="menu-grid">
+      <section class="panel preview-card">
+        <div class="preview-stage">
+          <canvas id="preview"></canvas>
+          <div class="preview-glow"></div>
+        </div>
+        <div class="preview-foot">
+          <div>
+            <b>DEIN CHARAKTER</b>
+            <small id="lookSummary">Klassisch</small>
+          </div>
+          <button class="mini" id="randomLook">ZUFALL</button>
+        </div>
       </section>
 
-      <section class="panel join-panel">
-        <h2>EINSATZ</h2>
-        <label class="field">
-          <span>DEIN NAME</span>
-          <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
-        </label>
+      <section class="panel play-card">
+        <nav class="tabs">
+          <button class="tab is-on" data-tab="deploy">EINSATZ</button>
+          <button class="tab" data-tab="look">CHARAKTER</button>
+          <button class="tab" data-tab="options">OPTIONEN</button>
+        </nav>
 
-        <div class="row2">
+        <div class="pane is-on" data-pane="deploy">
+          <div class="facts">
+            <div><b>15</b><span>ELIMINIERUNGEN</span></div>
+            <div><b>1</b><span>TREFFER = AUS</span></div>
+            <div><b>8</b><span>SPIELER MAX</span></div>
+          </div>
+
           <label class="field">
-            <span>QUALITÄT</span>
-            <select id="qualitySel">
-              <option value="high" selected>Hoch</option>
-              <option value="mid">Mittel</option>
-              <option value="low">Niedrig</option>
-            </select>
+            <span>DEIN NAME</span>
+            <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
           </label>
-          <label class="field">
-            <span>BOTS</span>
-            <select id="botsSel">
-              <option value="0">0</option>
-              <option value="2">2</option>
-              <option value="3" selected>3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </label>
+
+          <div class="row2">
+            <label class="field">
+              <span>QUALIT&Auml;T</span>
+              <select id="qualitySel">
+                <option value="high" selected>Hoch</option>
+                <option value="mid">Mittel</option>
+                <option value="low">Niedrig</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>BOTS</span>
+              <select id="botsSel">
+                <option value="0">0</option>
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+          </div>
+
+          <button class="btn primary" id="hostBtn"><span>RAUM ERSTELLEN</span><small>mit Bots starten</small></button>
+
+          <div class="or"><span>ODER RAUMCODE EINGEBEN</span></div>
+
+          <div class="join-row">
+            <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
+            <button class="btn" id="joinBtn">BEITRETEN</button>
+          </div>
+
+          <div id="menuStatus" class="status">Bereit.</div>
         </div>
 
-        <button class="btn primary" id="hostBtn"><span>RAUM ERSTELLEN</span><small>mit Bots starten</small></button>
-
-        <div class="or"><span>ODER RAUMCODE EINGEBEN</span></div>
-
-        <div class="join-row">
-          <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
-          <button class="btn" id="joinBtn">BEITRETEN</button>
+        <div class="pane" data-pane="look">
+          <div class="look-row"><span>JACKE</span><div class="swatches" id="swJacket"></div></div>
+          <div class="look-row"><span>SCHAL</span><div class="swatches" id="swScarf"></div></div>
+          <div class="look-row"><span>M&Uuml;TZE</span><div class="swatches" id="swHat"></div></div>
+          <div class="look-row"><span>HAUT</span><div class="swatches" id="swSkin"></div></div>
+          <p class="small-note">Deine Auswahl wird mit dem Namen an alle im Raum gesendet.</p>
         </div>
 
-        <div class="settings">
+        <div class="pane" data-pane="options">
           <label class="slider">
             <span>MAUS-EMPFINDLICHKEIT <b id="sensVal">1.0</b></span>
             <input id="sensRange" type="range" min="0.3" max="2.6" step="0.05" value="1" />
           </label>
           <label class="slider">
-            <span>LAUTSTÄRKE <b id="volVal">80%</b></span>
+            <span>LAUTST&Auml;RKE <b id="volVal">80%</b></span>
             <input id="volRange" type="range" min="0" max="1" step="0.05" value="0.8" />
           </label>
-        </div>
+          <label class="check">
+            <input type="checkbox" id="fpsToggle" />
+            <span>FPS-ANZEIGE EINBLENDEN <kbd>F</kbd></span>
+          </label>
 
-        <div id="menuStatus" class="status">Bereit.</div>
-        <p class="legal">Peer-to-Peer über WebRTC. Kein Account, kein Download.</p>
+          <div class="controls">
+            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Bewegen</span></div>
+            <div><kbd>SHIFT</kbd><span>Sprinten (Ausdauer)</span></div>
+            <div><kbd>SPACE</kbd><span>Springen</span></div>
+            <div><kbd>MAUS</kbd><span>Zielen</span></div>
+            <div><kbd>LMB</kbd><span>Werfen (halten)</span></div>
+            <div><kbd>TAB</kbd><span>Rangliste</span></div>
+            <div><kbd>M</kbd><span>Ton aus/an</span></div>
+            <div><kbd>ESC</kbd><span>Pause</span></div>
+          </div>
+        </div>
       </section>
     </div>
 
-    <div class="menu-footer">
-      <span>❄</span> SNOWBALL WARFARE · v1.0 <span class="sep">·</span> Ein Treffer. Tot.
-    </div>
+    <footer class="menu-foot">
+      <span>&#10052;</span> SNOWBALL WARFARE <span class="sep">&middot;</span> Peer-to-Peer &uuml;ber WebRTC <span class="sep">&middot;</span> Ein Treffer. Tot.
+    </footer>
   </div>
 
   <div id="loading" class="loading hidden">
     <div class="spinner"></div>
-    <div id="loadingText">Raum wird erstellt …</div>
+    <div id="loadingText">Raum wird erstellt &hellip;</div>
   </div>
 </div>
 
