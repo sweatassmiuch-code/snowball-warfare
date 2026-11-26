@@ -542,8 +542,8 @@ const preview = (() => {
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(31, 1, 0.05, 20);
-    camera.position.set(0, 1.05, 4.35);
-    camera.lookAt(0, 1.05, 0);
+    camera.position.set(0, 1.02, 4.05);
+    camera.lookAt(0, 1.02, 0);
 
     scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a3742, 1.9));
     const key = new THREE.DirectionalLight(0xfff3e4, 2.5);
