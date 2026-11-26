@@ -662,6 +662,69 @@ function tuftGeometry(len, rad) {
   return geo;
 }
 
+// The jacket's high collar, pulled up over nose and mouth. Its top edge sits
+// just under the eyes at the front and climbs at the sides and back until it
+// meets the beanie, so the only bare skin left is the narrow band with the
+// eyes. Built as an open shell (no caps): the face has to stay visible inside.
+function gaiterGeometry() {
+  const COLS = 72, ROWS = 18;
+  // radius profile in head units: y, half width, half depth
+  const rings = [
+    [-0.170, 0.0862, 0.0922], [-0.152, 0.0962, 0.1032],
+    [-0.134, 0.1002, 0.1076], [-0.114, 0.1018, 0.1098],
+    [-0.092, 0.1032, 0.1114], [-0.068, 0.1042, 0.1128],
+    [-0.048, 0.1046, 0.1140], [-0.028, 0.1040, 0.1136],
+    [-0.008, 0.1034, 0.1132], [0.012, 0.1028, 0.1128],
+    [0.026, 0.1022, 0.1122]
+  ];
+  const at = (y) => {
+    if (y <= rings[0][0]) return [rings[0][1], rings[0][2]];
+    for (let i = 1; i < rings.length; i++) {
+      const a = rings[i - 1], b = rings[i];
+      if (y <= b[0]) {
+        const t = (y - a[0]) / (b[0] - a[0] || 1);
+        return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+      }
+    }
+    const l = rings[rings.length - 1];
+    return [l[1], l[2]];
+  };
+  const smooth = (edge0, edge1, x) => {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+  };
+  const pos = [], uvs = [], idx = [], rim = [];
+  for (let i = 0; i <= COLS; i++) {
+    const phi = (i / COLS) * Math.PI * 2;
+    let a = phi;
+    while (a > Math.PI) a -= Math.PI * 2;
+    const s = Math.abs(a) / Math.PI;              // 0 front, 1 nape
+    const topY = -0.040 + 0.056 * smooth(0.26, 0.56, s);
+    const [trx, trz] = at(topY);
+    rim.push(new THREE.Vector3(-Math.sin(phi) * trx * 1.004, topY + 0.0004, -Math.cos(phi) * trz * 1.004));
+    for (let j = 0; j <= ROWS; j++) {
+      const t = j / ROWS;
+      const y = -0.170 + (topY + 0.170) * t;
+      const [rx, rz] = at(y);
+      pos.push(-Math.sin(phi) * rx, y, -Math.cos(phi) * rz);
+      uvs.push(i / COLS, t);
+    }
+  }
+  for (let i = 0; i < COLS; i++) {
+    for (let j = 0; j < ROWS; j++) {
+      const a = i * (ROWS + 1) + j, b = a + ROWS + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return { geometry: geo, rim: rim.slice(0, COLS) };
+}
+
 const fabricNormal = () => normalTexture('fabric', 256, fabricH, 2.6);
 const knitNormal = () => normalTexture('knit', 256, knitH, 3.0);
 const hairNormal = () => normalTexture('hair', 256, hairH, 2.4);
@@ -1093,13 +1156,10 @@ export function createCharacter(colorIdx, look) {
   const headMesh = add(headGroup, headGeometry(), m.face, [0, 0, 0]);
   headMesh.castShadow = true;
 
-  add(headGroup, decalGeometry(0, -0.069, -0.088, 0.062, 0.036, 18, 14), m.mouth);
-
+  // Beanie on the brows, collar over nose and mouth: the only decals left are
+  // the eyes. A mouth or brow decal here would sit under the knit anyway.
   const blinkers = [];
   for (const side of [-1, 1]) {
-    // brows are mirrored, so the arch lifts outwards on both sides
-    add(headGroup, decalGeometry(side * 0.038, 0.033, -0.079, 0.046, 0.012, 14, 6),
-      side < 0 ? m.browDecalL : m.browDecal);
     // one almond patch for both open and shut, so the blink cannot slip
     const patch = decalGeometry(side * 0.0375, -0.006, -0.085, 0.058, 0.061, 24, 26);
     const openEye = new THREE.Mesh(patch, m.eyeOpen);
@@ -1111,35 +1171,47 @@ export function createCharacter(colorIdx, look) {
     headGroup.add(shutEye);
     blinkers.push({ open: openEye, shut: shutEye });
 
-    // ear: a small flat shell tucked against the skull with a shaded bowl
-    add(headGroup, new THREE.SphereGeometry(0.0225, 16, 14), m.skin,
-      [side * 0.0985, -0.002, 0.004], [0.06, side * -0.26, side * 0.08], [0.34, 1.0, 0.70]);
-    add(headGroup, new THREE.SphereGeometry(0.0110, 12, 10), m.skinShadow,
-      [side * 0.1040, -0.002, -0.004], [0.06, side * -0.26, side * 0.08], [0.26, 0.80, 0.42]);
+    // no ears: the beanie is pulled down over them, so they only risked
+    // poking through the knit from a three-quarter view
   }
 
-  add(headGroup, hairGeometry(), m.hair, [0, 0.000, 0]);
+  // Collar pulled up over nose and mouth. It covers chin, mouth and nose,
+  // meets the beanie at the temples and at the nape, and leaves exactly one
+  // window open: the eye band.
+  const wrap = gaiterGeometry();
+  const gaiter = add(headGroup, wrap.geometry, m.jacket, [0, 0, 0]);
+  gaiter.name = 'gaiter';
+  gaiter.castShadow = true;
+  // fleece lip rolled round the collar's whole top edge: it follows the edge
+  // up the cheeks instead of cutting a white band straight across the face
+  const rimCurve = new THREE.CatmullRomCurve3(wrap.rim, true);
+  add(headGroup, new THREE.TubeGeometry(rimCurve, 96, 0.0031, 8, true), m.scarf, [0, 0, 0]);
 
 
 
   // beanie fitted to the skull: dome from the brow line to the crown
-  // One lathed profile: rolled brim, soft fold and a dome that clears the
-  // skull by a few millimetres at every height.
-  // brim pulled down over the forehead: worn high, the beanie read as a cap
-  // perched on top of the skull
-  const hatProfile = [
-    [0.0995, 0.0720], [0.1058, 0.0800], [0.1072, 0.0890],
-    [0.1048, 0.0960], [0.1025, 0.1010], [0.1008, 0.1090],
-    [0.0990, 0.1180], [0.0952, 0.1275], [0.0880, 0.1355],
-    [0.0755, 0.1420], [0.0555, 0.1458], [0.0280, 0.1476], [0.0002, 0.1482]
-  ].map((p) => new THREE.Vector2(p[0], p[1]));
-  add(headGroup, new THREE.LatheGeometry(hatProfile, 40), m.beanie, [0, 0, 0]);
-  // rolled brim: a darker knit ring so the hat reads as a folded band
-  // the fold of the cuff, drawn as a thin seam instead of a fat donut brim
-  add(headGroup, new THREE.TorusGeometry(0.1048, 0.0042, 6, 40), m.beanieDark,
-    [0, 0.0975, 0], [Math.PI / 2, 0, 0], [1, 1, 1]);
-  // oversized pom, like the reference: the hat's white full stop
-  add(headGroup, new THREE.SphereGeometry(0.0290, 18, 14), m.snow, [0, 0.1478, 0], null, [1, 0.9, 1]);
+  // Beanie pulled down over the brows: the hem sits about two centimetres
+  // above the eyes, a deep cuff folds over the temples and the crown slouches
+  // backwards, which is what separates a worn hat from a cap perched on top.
+  const hatRings = [
+    [0.0205, 0.0035, 0.1072, 0.1118], [0.0250, 0.0040, 0.1108, 0.1152],
+    [0.0330, 0.0050, 0.1120, 0.1162], [0.0450, 0.0060, 0.1112, 0.1154],
+    [0.0560, 0.0072, 0.1092, 0.1134], [0.0660, 0.0088, 0.1070, 0.1112],
+    [0.0800, 0.0115, 0.1036, 0.1078], [0.0930, 0.0150, 0.0986, 0.1028],
+    [0.1050, 0.0190, 0.0916, 0.0956], [0.1150, 0.0235, 0.0828, 0.0864],
+    [0.1240, 0.0285, 0.0712, 0.0742], [0.1310, 0.0330, 0.0566, 0.0590],
+    [0.1362, 0.0365, 0.0392, 0.0408], [0.1392, 0.0385, 0.0200, 0.0208],
+    [0.1402, 0.0395, 0.0006, 0.0006]
+  ];
+  const beanie = add(headGroup, ringLoft(hatRings, 44), m.beanie, [0, 0, 0]);
+  beanie.name = 'beanie';
+  beanie.castShadow = true;
+  // fold of the cuff as a darker knit seam, elliptical like the hat itself
+  add(headGroup, loftGeometry([
+    [0.0295, 0.1114, 0.1156], [0.0335, 0.1130, 0.1172], [0.0375, 0.1116, 0.1158]
+  ], 44), m.beanieDark, [0, 0, 0.0050]);
+  // pom sitting on the slouched crown
+  add(headGroup, new THREE.SphereGeometry(0.0300, 18, 14), m.snow, [0, 0.1510, 0.0430], null, [1, 0.92, 1]);
 
   // ---- scarf ------------------------------------------------------------
   // lives on the neck, not on the head, so scaling the head leaves it alone
