@@ -64,6 +64,8 @@
 <!-- ===================== START MENU ===================== -->
 <div id="menu" class="fullscreen menu-v3">
   <div class="menu-bg"></div>
+  <div class="v3-aurora" aria-hidden="true"></div>
+  <div class="v3-snow" aria-hidden="true"></div>
 
   <header class="v3-head">
     <div class="v3-brand">
@@ -80,12 +82,14 @@
   </header>
 
   <main class="v3-stage">
+    <div class="v3-spot"></div>
+    <div class="v3-floor"></div>
     <div class="v3-glow"></div>
     <canvas id="preview"></canvas>
-    <div class="v3-caption">
-      <b>DEIN CHARAKTER</b>
-      <small id="lookSummary">Blau &middot; Weiss &middot; Hell</small>
-      <button id="randomLook">ZUFALL</button>
+    <div class="v3-badges">
+      <span><i class="dot-live"></i>1 TREFFER &middot; AUS</span>
+      <span>2&ndash;6 SPIELER</span>
+      <span>P2P</span>
     </div>
   </main>
 
@@ -95,10 +99,17 @@
       <span class="play-word">PLAY</span>
       <small>RAUM ERSTELLEN</small>
     </button>
+    <div class="v3-play-key"><kbd>ENTER</kbd></div>
     <div id="menuStatus" class="status">Bereit.</div>
   </aside>
 
   <footer class="v3-dock">
+    <div class="v3-dock-head">
+      <b>DEIN CHARAKTER</b>
+      <small id="lookSummary">Blau &middot; Weiss &middot; Hell</small>
+      <button id="randomLook">ZUFALL</button>
+    </div>
+
     <label class="v3-field v3-name">
       <span>DEIN NAME</span>
       <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />

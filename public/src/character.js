@@ -180,23 +180,19 @@ function headGauss(x, y, z, cx, cy, cz, rx, ry, rz) {
 // Positive pushes out, negative carves in. Coordinates: x right, y up, z back.
 function headSculpt(x, y, z) {
   const g = (cx, cy, cz, rx, ry, rz) => headGauss(x, y, z, cx, cy, cz, rx, ry, rz);
+  // Cartoon faces are smooth: no carved sockets, no nostril dents and no
+  // mouth trough. Only the soft volumes that read from across the map stay.
   let d = 0;
   for (const s of [-1, 1]) {
-    d += g(s * 0.030, 0.026, -0.080, 0.048, 0.014, 0.042) * 0.0055;   // brow ridge
-    d += g(s * 0.037, 0.008, -0.084, 0.030, 0.024, 0.034) * -0.0052;  // eye socket
-    d += g(s * 0.050, -0.020, -0.068, 0.032, 0.030, 0.042) * 0.0072;  // cheek apple
-    d += g(s * 0.045, -0.052, -0.078, 0.022, 0.018, 0.030) * -0.0022; // cheek to jaw hollow
-    d += g(s * 0.060, -0.070, -0.050, 0.024, 0.026, 0.040) * 0.0040;  // jaw corner
-    d += g(s * 0.080, 0.030, -0.004, 0.022, 0.032, 0.038) * -0.0042;  // temple
-    d += g(s * 0.010, -0.038, -0.099, 0.008, 0.008, 0.016) * -0.0038; // nostril dent
+    d += g(s * 0.048, -0.020, -0.070, 0.036, 0.030, 0.044) * 0.0060;  // cheek apple
+    d += g(s * 0.062, -0.066, -0.048, 0.026, 0.026, 0.040) * 0.0030;  // jaw corner
+    d += g(s * 0.082, 0.030, -0.004, 0.024, 0.034, 0.040) * -0.0028;  // temple
   }
-  d += g(0, 0.060, -0.072, 0.072, 0.042, 0.042) * 0.0030;   // forehead dome
-  d += g(0, -0.004, -0.097, 0.013, 0.026, 0.020) * 0.0072;  // nose bridge
-  d += g(0, -0.034, -0.098, 0.019, 0.017, 0.026) * 0.0150;  // nose tip
-  d += g(0, -0.063, -0.092, 0.024, 0.006, 0.020) * -0.0052; // mouth trough
-  d += g(0, -0.076, -0.092, 0.018, 0.009, 0.020) * 0.0032;  // lower lip
-  d += g(0, -0.101, -0.082, 0.020, 0.018, 0.028) * 0.0058;  // chin
-  d += g(0, 0.010, 0.078, 0.072, 0.080, 0.044) * 0.0042;    // occiput
+  d += g(0, 0.052, -0.070, 0.076, 0.046, 0.044) * 0.0022;  // forehead
+  d += g(0, -0.010, -0.098, 0.014, 0.020, 0.018) * 0.0040; // nose bridge
+  d += g(0, -0.036, -0.100, 0.022, 0.020, 0.024) * 0.0090; // button nose
+  d += g(0, -0.098, -0.080, 0.022, 0.020, 0.028) * 0.0040; // chin
+  d += g(0, 0.010, 0.078, 0.072, 0.080, 0.044) * 0.0030;   // occiput
   return d;
 }
 
@@ -211,8 +207,8 @@ function headGeometry() {
     p.set(px * HEAD_W, py * HEAD_H, pz * HEAD_D);
     // narrow the jaw towards the chin: a childlike, readable silhouette
     const t = Math.max(0, Math.min(1, (-p.y - 0.004) / 0.104));
-    p.x *= 1 - 0.26 * t * t;
-    p.z *= 1 - 0.06 * t * t;
+    p.x *= 1 - 0.21 * t * t;
+    p.z *= 1 - 0.05 * t * t;
     const d = headSculpt(p.x, p.y, p.z);
     const nx = p.x / (HEAD_W * HEAD_W), ny = p.y / (HEAD_H * HEAD_H), nz = p.z / (HEAD_D * HEAD_D);
     const nl = Math.hypot(nx, ny, nz) || 1;
@@ -288,19 +284,13 @@ function faceAlbedo(idx) {
   };
 
   for (const s of [-1, 1]) {
-    blob(s * 0.036, 0.011, -0.082, 0.034, 0.024, [118, 78, 70], 0.34);  // socket shadow
-    blob(s * 0.034, 0.024, -0.084, 0.026, 0.007, [104, 66, 58], 0.26);  // lid crease
-    blob(s * 0.052, -0.026, -0.070, 0.036, 0.030, [226, 128, 112], 0.32); // rosy cheek
-    blob(s * 0.012, -0.028, -0.095, 0.008, 0.026, [120, 78, 68], 0.26);  // nose side
-    blob(s * 0.010, -0.039, -0.096, 0.005, 0.004, [116, 80, 72], 0.34);  // nostril
-    blob(s * 0.078, 0.052, -0.020, 0.026, 0.034, [148, 106, 94], 0.16);  // temple
-    blob(s * 0.058, -0.074, -0.062, 0.020, 0.020, [140, 96, 86], 0.18);  // jaw hollow
+    blob(s * 0.054, -0.030, -0.066, 0.040, 0.032, [232, 132, 118], 0.36); // rosy cheek
+    blob(s * 0.082, 0.052, -0.020, 0.026, 0.034, [148, 106, 94], 0.10);   // temple
   }
-  blob(0, -0.032, -0.100, 0.017, 0.014, [230, 124, 108], 0.26);  // rosy nose
-  blob(0, -0.098, -0.082, 0.024, 0.014, [132, 94, 86], 0.10);    // under the chin
-  blob(0, 0.068, -0.062, 0.066, 0.018, [130, 94, 84], 0.14);     // hairline, front
+  blob(0, -0.040, -0.100, 0.022, 0.016, [232, 128, 112], 0.22);  // rosy nose tip
+  blob(0, 0.068, -0.062, 0.066, 0.018, [130, 94, 84], 0.10);     // hairline, front
   for (const s of [-1, 1]) {
-    blob(s * 0.074, 0.030, -0.030, 0.022, 0.024, [126, 90, 82], 0.16); // hairline, side
+    blob(s * 0.076, 0.030, -0.030, 0.022, 0.024, [126, 90, 82], 0.10); // hairline, side
   }
 
   ctx.globalCompositeOperation = 'overlay';
@@ -350,52 +340,112 @@ function tileNoise(x, y, p) {
   return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
 }
 
-// Cartoon eye: one tall black oval with a wet catchlight. Sclera, iris and
-// lashes read as a realistic doll at arm's length; the reference character's
-// solid ovals stay readable across the whole map.
+// Cartoon eye: a bright sclera, one big warm iris and a pupil with two
+// catchlights. Solid black ovals read as a hollow skull at this head size, so
+// the white stays visible around the iris and a soft lid line frames the top.
+const IRIS_CSS = ['#8a5a30', '#3f6076', '#7a5c36', '#4a3326', '#8d6a3e', '#575350'];
 function eyeTexture(idx, open) {
-  const key = 'eye:' + (open ? 1 : 0);
+  const i = idx % IRIS_CSS.length;
+  const key = 'eye:' + i + ':' + (open ? 1 : 0);
   if (texCache.has(key)) return texCache.get(key);
   const W = 256, H = 320;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  const cx = W / 2, cy = H / 2;
+  const cx = W / 2, cy = H / 2 + 8;
 
   if (!open) {
-    ctx.strokeStyle = '#1b151b';
+    // closed: a soft lash arc, thick in the middle, fading at the corners
     ctx.lineCap = 'round';
-    ctx.lineWidth = 15;
+    ctx.strokeStyle = 'rgba(120,74,62,0.35)';
+    ctx.lineWidth = 8;
     ctx.beginPath();
-    ctx.moveTo(cx - 62, cy + 4);
-    ctx.quadraticCurveTo(cx, cy + 30, cx + 62, cy + 4);
+    ctx.moveTo(cx - 50, cy + 22);
+    ctx.quadraticCurveTo(cx, cy + 50, cx + 50, cy + 22);
+    ctx.stroke();
+    ctx.strokeStyle = '#2b1d1c';
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.moveTo(cx - 72, cy - 6);
+    ctx.quadraticCurveTo(cx, cy + 40, cx + 72, cy - 6);
     ctx.stroke();
   } else {
-    // soft contact shadow so the oval sits inside the face instead of on it
-    ctx.save();
-    ctx.filter = 'blur(12px)';
-    ctx.fillStyle = 'rgba(60,32,26,0.34)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 6, 82, 118, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    const rx = 84, ry = 102;
 
-    const g = ctx.createLinearGradient(cx, cy - 116, cx, cy + 116);
-    g.addColorStop(0, '#2a2430');
-    g.addColorStop(0.42, '#121019');
-    g.addColorStop(1, '#05060a');
-    ctx.fillStyle = g;
+    // sclera: a warm white that darkens slightly towards the lid
+    const white = ctx.createLinearGradient(cx, cy - ry, cx, cy + ry);
+    white.addColorStop(0, '#e9eff8');
+    white.addColorStop(0.45, '#ffffff');
+    white.addColorStop(1, '#eef4fb');
+    ctx.fillStyle = white;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, 76, 114, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // catchlight: the one highlight that makes a flat oval feel wet
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    // iris: big and warm, sitting a touch low so the gaze reads friendly
+    const ir = 67;
+    const ig = ctx.createRadialGradient(cx, cy - 16, 6, cx, cy + 2, ir);
+    ig.addColorStop(0, IRIS_CSS[i]);
+    ig.addColorStop(0.72, IRIS_CSS[i]);
+    ig.addColorStop(1, '#241a13');
+    ctx.fillStyle = ig;
     ctx.beginPath();
-    ctx.ellipse(cx - 24, cy - 46, 13, 19, -0.3, 0, Math.PI * 2);
+    ctx.arc(cx, cy + 2, ir, 0, Math.PI * 2);
     ctx.fill();
+
+    // pupil
+    ctx.fillStyle = '#100c0b';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 2, 34, 0, Math.PI * 2);
+    ctx.fill();
+
+    // catchlights: the two dots that make the eye look wet and alive
+    ctx.fillStyle = 'rgba(255,255,255,0.97)';
+    ctx.beginPath();
+    ctx.ellipse(cx - 27, cy - 36, 19, 24, -0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath();
+    ctx.arc(cx + 27, cy + 32, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // upper lid: one clean dark arc, no lashes or make-up
+    ctx.strokeStyle = '#2c1e1c';
+    ctx.lineWidth = 13;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx - 1, ry - 1, 0, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.stroke();
   }
 
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  texCache.set(key, tex);
+  return tex;
+}
+
+// Eyebrow: a soft tapered arc, placed as its own decal so it follows the brow
+// curve of the sculpted head instead of floating in front of it.
+function browTexture() {
+  const key = 'brow:cartoon';
+  if (texCache.has(key)) return texCache.get(key);
+  const W = 256, H = 80;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.lineCap = 'round';
+  const g = ctx.createLinearGradient(24, 0, 232, 0);
+  g.addColorStop(0, 'rgba(52,32,22,0.55)');
+  g.addColorStop(0.35, 'rgba(52,32,22,0.95)');
+  g.addColorStop(0.75, 'rgba(52,32,22,0.95)');
+  g.addColorStop(1, 'rgba(52,32,22,0.5)');
+  ctx.strokeStyle = g;
+  ctx.lineWidth = 26;
+  ctx.beginPath();
+  ctx.moveTo(26, 52);
+  ctx.quadraticCurveTo(128, 20, 230, 44);
+  ctx.stroke();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
@@ -414,18 +464,18 @@ function mouthTexture() {
 
   ctx.strokeStyle = 'rgba(74,36,30,0.92)';
   ctx.lineCap = 'round';
-  ctx.lineWidth = 9;
+  ctx.lineWidth = 12;
   ctx.beginPath();
-  ctx.moveTo(58, 66);
-  ctx.quadraticCurveTo(128, 112, 198, 66);
+  ctx.moveTo(38, 58);
+  ctx.quadraticCurveTo(128, 132, 218, 58);
   ctx.stroke();
 
   // a soft lower lip keeps the line from reading as a scratch
-  ctx.strokeStyle = 'rgba(214,140,124,0.28)';
-  ctx.lineWidth = 7;
+  ctx.strokeStyle = 'rgba(214,140,124,0.26)';
+  ctx.lineWidth = 8;
   ctx.beginPath();
-  ctx.moveTo(72, 86);
-  ctx.quadraticCurveTo(128, 118, 184, 86);
+  ctx.moveTo(62, 88);
+  ctx.quadraticCurveTo(128, 138, 194, 88);
   ctx.stroke();
 
   const tex = new THREE.CanvasTexture(c);
@@ -561,12 +611,16 @@ function materialsFor(idx, look) {
       envMapIntensity: 0.3
     }),
     eyeOpen: new THREE.MeshStandardMaterial({
-      map: eyeTexture(k, true), transparent: true, roughness: 0.55, metalness: 0,
-      envMapIntensity: 0.25,
+      map: eyeTexture(k, true), transparent: true, roughness: 0.42, metalness: 0,
+      envMapIntensity: 0.35,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
     }),
     eyeClosed: new THREE.MeshStandardMaterial({
-      map: eyeTexture(k, false), transparent: true, roughness: 0.6, metalness: 0,
+      map: eyeTexture(k, false), transparent: true, roughness: 0.5, metalness: 0,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
+    }),
+    browDecal: new THREE.MeshStandardMaterial({
+      map: browTexture(), transparent: true, roughness: 0.8, metalness: 0,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, side: THREE.DoubleSide
     }),
     mouth: new THREE.MeshStandardMaterial({
@@ -855,12 +909,14 @@ export function createCharacter(colorIdx, look) {
   const headMesh = add(headGroup, headGeometry(), m.face, [0, 0, 0]);
   headMesh.castShadow = true;
 
-  add(headGroup, decalGeometry(0, -0.086, -0.088, 0.078, 0.040, 18, 12), m.mouth);
+  add(headGroup, decalGeometry(0, -0.070, -0.090, 0.070, 0.040, 18, 14), m.mouth);
 
   const blinkers = [];
   for (const side of [-1, 1]) {
+    // brow first: the small arc that gives the face its friendly expression
+    add(headGroup, decalGeometry(side * 0.040, 0.045, -0.080, 0.054, 0.018, 14, 6), m.browDecal);
     // eye decal: open and shut share one surface patch so the blink cannot slip
-    const patch = decalGeometry(side * 0.038, -0.020, -0.082, 0.060, 0.104, 20, 24);
+    const patch = decalGeometry(side * 0.040, -0.012, -0.084, 0.060, 0.076, 22, 26);
     const openEye = new THREE.Mesh(patch, m.eyeOpen);
     openEye.renderOrder = 3;
     headGroup.add(openEye);
@@ -894,13 +950,14 @@ export function createCharacter(colorIdx, look) {
     const a = -0.95 + i * 0.2714;
     const px = Math.sin(a) * (HEAD_W + 0.002);
     const pz = -Math.cos(a) * (HEAD_D + 0.002);
-    const py = 0.066 - Math.abs(a) * 0.006;
+    const py = 0.074 - Math.abs(a) * 0.006;
     tuft(px, py, pz, Math.sin(a) * 0.42, -0.94, -Math.cos(a) * 0.34,
-      0.028 + (i % 3) * 0.005 + (i === 4 ? 0.004 : 0), 0.032);
+      0.024 + (i % 3) * 0.004 + (i === 4 ? 0.003 : 0), 0.030);
   }
-  // temple tufts point outwards, leaving the cheeks clear
+  // sideburns: short tufts that hug the temple and sweep back, so the head no
+  // longer grows horns at ear height
   for (const side of [-1, 1]) {
-    tuft(side * (HEAD_W + 0.001), 0.048, -0.030, side * 1.0, 0.16, -0.12, 0.056, 0.024);
+    tuft(side * (HEAD_W - 0.006), 0.022, -0.050, side * 0.26, -0.84, 0.48, 0.030, 0.016);
   }
   for (let i = 0; i < 5; i++) {
     const a = -0.62 + i * 0.31;
@@ -938,50 +995,44 @@ export function createCharacter(colorIdx, look) {
   collar.castShadow = true;
 
   // ---- arms -------------------------------------------------------------
+  // One continuous, skinned sleeve from shoulder to wrist. The old arm was two
+  // separate tubes with a cap at the elbow, which read as a hard ring and left
+  // a gap when it folded. A single tube with a weight blend across the joint
+  // bends like cloth.
+  const armProfile = (t) => {
+    if (t < 0.05) return 0.030 + (t / 0.05) * 0.042;    // cap tucked in the body
+    if (t < 0.18) return 0.0720 - (t - 0.05) * 0.060;   // deltoid
+    if (t < 0.44) return 0.0642 - (t - 0.18) * 0.030;   // upper sleeve
+    if (t < 0.56) return 0.0564 - (t - 0.44) * 0.008;   // elbow
+    if (t < 0.88) return 0.0554 + (t - 0.56) * 0.004;   // forearm
+    return 0.0567 - (t - 0.88) / 0.12 * 0.012;          // wrist
+  };
   function makeArm(side) {
-    const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.179, 0.494, 0);
-    shoulder.rotation.z = side * 0.06;
+    const shoulder = new THREE.Bone();
+    shoulder.position.set(side * 0.176, 0.494, 0);
+    shoulder.rotation.z = side * 0.055;
     torsoGroup.add(shoulder);
 
-    // upper sleeve: starts wide inside the shoulder and tapers into the elbow
-    const upperGeo = limbGeometry(0, 0, 0, 0.325, 0, (t) => {
-      if (t < 0.12) return 0.058 + t * 0.075;
-      if (t < 0.50) return 0.0670 - (t - 0.12) * 0.020;
-      if (t < 0.90) return 0.0594 - (t - 0.50) * 0.022;
-      return 0.0506 - (t - 0.90) * 0.120;
-    }, { rings: 18, radial: 18 });
-    const upper = new THREE.Mesh(upperGeo, m.jacket);
-    upper.castShadow = true; upper.receiveShadow = true;
-    shoulder.add(upper);
-    // shoulder of the jacket: a soft cap that carries the sleeve into the body
-    const deltoid = add(shoulder, new THREE.SphereGeometry(1, 20, 16), m.jacket,
-      [side * -0.010, -0.014, 0], [0, 0, side * 0.13], [0.074, 0.061, 0.070]);
-
-    const elbow = new THREE.Group();
+    const elbow = new THREE.Bone();
     elbow.position.y = -0.30;
     shoulder.add(elbow);
-    // forearm starts slightly wider than the upper sleeve ends, hiding the seam
-    const foreGeo = limbGeometry(0, 0, 0, 0.30, 0, (t) => {
-      if (t < 0.06) return 0.0570 - t * 0.14;
-      if (t < 0.55) return 0.0486 + (t - 0.06) * 0.005;
-      if (t < 0.92) return 0.0510 - (t - 0.55) * 0.016;
-      return 0.0451 - (t - 0.92) * 0.22;
-    }, { rings: 18, radial: 18 });
-    const fore = new THREE.Mesh(foreGeo, m.jacket);
-    fore.castShadow = true; fore.receiveShadow = true;
-    elbow.add(fore);
-    // white knit cuff: the reference's sleeve ends in a bright band
-    add(elbow, new THREE.CylinderGeometry(0.053, 0.059, 0.058, 18), m.scarf, [0, -0.246, 0]);
-    // mitten: one soft palm, a thumb and a knit cuff — cleaner than four fingers
+
+    const armGeo = limbGeometry(0, 0, 0, 0.30, 0.30, armProfile, { rings: 30, radial: 18, blend: 0.070 });
+    const arm = new THREE.SkinnedMesh(armGeo, m.jacket);
+    arm.castShadow = true; arm.receiveShadow = true;
+    shoulder.add(arm);
+    root.updateMatrixWorld(true);
+    arm.bind(new THREE.Skeleton([shoulder, elbow]), arm.matrixWorld.clone());
+
+    // white knit cuff at the wrist, then one soft mitten (palm + thumb)
+    add(elbow, new THREE.CylinderGeometry(0.058, 0.060, 0.056, 18), m.scarf, [0, -0.262, 0]);
     const hand = new THREE.Group();
-    hand.position.y = -0.285;
+    hand.position.y = -0.290;
     elbow.add(hand);
-    add(hand, new THREE.CylinderGeometry(0.046, 0.051, 0.034, 18), m.scarf, [0, 0.004, 0]);
-    add(hand, new THREE.SphereGeometry(1, 20, 16), m.mitten, [0, -0.056, -0.008], [0.08, 0, 0], [0.058, 0.080, 0.046]);
-    add(hand, new THREE.SphereGeometry(1, 14, 12), m.mitten, [0, -0.120, -0.006], null, [0.038, 0.026, 0.038]);
-    add(hand, new THREE.CapsuleGeometry(0.0180, 0.036, 4, 10), m.mitten,
-      [side * -0.046, -0.060, -0.020], [0.25, 0, side * 0.95]);
+    add(hand, new THREE.CapsuleGeometry(0.050, 0.052, 5, 16), m.mitten,
+      [0, -0.050, -0.004], [0.06, 0, 0], [1, 1, 0.88]);
+    add(hand, new THREE.CapsuleGeometry(0.020, 0.040, 4, 12), m.mitten,
+      [side * -0.040, -0.042, -0.014], [0.30, 0, side * 0.95]);
     return { shoulder, elbow, hand };
   }
   const armR = makeArm(1);
@@ -1085,12 +1136,15 @@ export function createCharacter(colorIdx, look) {
   // Throw animation as key poses: coil away from the target, snap through,
   // then overshoot and settle. Poses are blended instead of switched, so the
   // motion keeps its weight at any frame rate.
+  // The character faces -Z, so a positive shoulder rotation swings the arm
+  // forward and a positive elbow rotation folds the forearm forward. The old
+  // keys had both signs inverted, which is why the arm threw itself backwards.
   const THROW_KEYS = [
-    { t: 0.00, ty: 0.00, tx: 0.00, rx: 0.00, rz: 0.00, re: -0.32, rw: 0.00, lx: 0.00, lz: 0.00, dip: 0.000 },
-    { t: 0.16, ty: -0.46, tx: -0.07, rx: 1.45, rz: 0.36, re: -1.75, rw: -0.58, lx: -0.42, lz: -0.20, dip: -0.040 },
-    { t: 0.33, ty: 0.36, tx: 0.18, rx: -2.10, rz: -0.12, re: -0.22, rw: 0.64, lx: 0.62, lz: 0.32, dip: 0.014 },
-    { t: 0.56, ty: 0.25, tx: 0.24, rx: -1.32, rz: -0.30, re: -0.54, rw: 0.30, lx: 0.34, lz: 0.42, dip: 0.008 },
-    { t: 1.00, ty: 0.00, tx: 0.00, rx: 0.00, rz: 0.00, re: -0.32, rw: 0.00, lx: 0.00, lz: 0.00, dip: 0.000 }
+    { t: 0.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000 },
+    { t: 0.20, ty: -0.38, tx: 0.06, rx: -2.35, rz: 0.28, re: 1.25, rw: -0.30, lx: 0.52, lz: -0.26, dip: -0.035 },
+    { t: 0.34, ty: 0.30, tx: -0.12, rx: 2.05, rz: 0.02, re: 0.18, rw: 0.40, lx: -0.30, lz: -0.14, dip: 0.012 },
+    { t: 0.58, ty: 0.22, tx: -0.16, rx: 1.32, rz: -0.12, re: 0.34, rw: 0.18, lx: -0.16, lz: -0.08, dip: 0.004 },
+    { t: 1.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000 }
   ];
   const throwPose = { ty: 0, tx: 0, rx: 0, rz: 0, re: 0, rw: 0, lx: 0, lz: 0, dip: 0 };
   function sampleThrow(t) {
@@ -1152,12 +1206,12 @@ export function createCharacter(colorIdx, look) {
       legR.hip.rotation.x = -buckle * 0.55;
       legL.knee.rotation.x = buckle * 1.15;
       legR.knee.rotation.x = buckle * 0.75;
-      armR.shoulder.rotation.x = -ease * 1.5;
+      armR.shoulder.rotation.x = ease * 0.85;
       armR.shoulder.rotation.z = -ease * 0.5;
-      armL.shoulder.rotation.x = -ease * 0.8;
+      armL.shoulder.rotation.x = ease * 0.55;
       armL.shoulder.rotation.z = ease * 0.7;
-      armR.elbow.rotation.x = -0.4 + ease * 0.5;
-      armL.elbow.rotation.x = -0.4;
+      armR.elbow.rotation.x = 0.30 + ease * 0.45;
+      armL.elbow.rotation.x = 0.30;
       torsoGroup.rotation.y = ease * 0.25 * state.deadSide;
       headGroup.rotation.x = ease * 0.35;
       headGroup.rotation.y = 0;
@@ -1191,17 +1245,17 @@ export function createCharacter(colorIdx, look) {
 
     // torso counter-rotates against the hips and leans into the run
     torsoGroup.rotation.y = -sp * 0.20 * amp;
-    torsoGroup.rotation.x = (0.05 + 0.10 * amp) * amp;
+    torsoGroup.rotation.x = -(0.04 + 0.09 * amp) * amp;
     torsoGroup.rotation.z = -lean * 0.14;
     torsoGroup.position.y = 0.02 + Math.sin(state.time * 1.7) * 0.004 * (1 - amp);
 
-    // arms swing opposite the legs; elbows fold as they come forward
-    armL.shoulder.rotation.x = -sp * (0.50 + 0.60 * amp) * amp;
-    armR.shoulder.rotation.x = sp * (0.50 + 0.60 * amp) * amp;
+    // arms swing opposite the legs; elbows fold forwards as they come forward
+    armL.shoulder.rotation.x = 0.05 - sp * (0.50 + 0.60 * amp) * amp;
+    armR.shoulder.rotation.x = 0.05 + sp * (0.50 + 0.60 * amp) * amp;
     armL.shoulder.rotation.z = -0.07 - 0.05 * amp;
     armR.shoulder.rotation.z = 0.07 + 0.05 * amp;
-    armL.elbow.rotation.x = -0.30 - Math.max(0, -sp) * 0.90 * amp;
-    armR.elbow.rotation.x = -0.30 - Math.max(0, sp) * 0.90 * amp;
+    armL.elbow.rotation.x = 0.22 + Math.max(0, -sp) * 0.55 * amp;
+    armR.elbow.rotation.x = 0.22 + Math.max(0, sp) * 0.55 * amp;
 
     // idle: breathing, a slow weight shift and an occasional glance
     const idle = 1 - Math.min(1, amp / 0.15);
@@ -1327,47 +1381,52 @@ export function createViewModel(look) {
 
   const group = new THREE.Group();
 
-  // throwing arm: short sleeve from the bottom corner, wrist, mitten
+  // First-person arm: the sleeve enters from the lower right, ends in a knit
+  // cuff and a chunky mitten, and the snowball is cradled in the palm with the
+  // thumb and knuckles wrapped over its front. The old version was a bare tube
+  // with a small black cap and the ball floating above it.
   const armPivot = new THREE.Group();
-  armPivot.position.set(0.46, -0.30, -0.78);
+  armPivot.position.set(0.38, -0.26, -0.70);
   group.add(armPivot);
 
-  const forearm = add(armPivot, new THREE.CapsuleGeometry(0.072, 0.22, 4, 16), sleeve,
-    [0, -0.09, -0.03], [-1.02, 0.16, 0.16]);
+  const arm = new THREE.Group();
+  arm.position.set(0.015, -0.020, 0.035);
+  arm.rotation.set(-0.28, 0, 0.42);
+  armPivot.add(arm);
+  const forearm = add(arm, new THREE.CapsuleGeometry(0.070, 0.30, 6, 18), sleeve, [0, -0.19, 0]);
   forearm.castShadow = false;
-  const cuff = add(armPivot, new THREE.CylinderGeometry(0.082, 0.090, 0.074, 16), trim,
-    [-0.022, 0.002, -0.132], [-1.02, 0.16, 0.16]);
+  const cuff = add(arm, new THREE.CylinderGeometry(0.080, 0.089, 0.072, 20), trim, [0, -0.012, 0]);
   cuff.castShadow = false;
 
   const hand = new THREE.Group();
-  hand.position.set(-0.035, 0.020, -0.150);
-  hand.rotation.set(0.12, 0, 0);
+  hand.position.set(-0.015, 0.015, -0.015);
+  hand.rotation.set(-0.20, 0.24, 0.10);
   armPivot.add(hand);
 
   const mitten = new THREE.Group();
   hand.add(mitten);
-  // one rounded mitten: palm, curled finger mass and thumb, no separate fingers
-  const palm = add(mitten, new THREE.SphereGeometry(1, 20, 16), glove, [0, 0, 0],
-    [0.08, 0, 0.05], [0.076, 0.096, 0.064]);
+  const palm = add(mitten, new THREE.SphereGeometry(1, 22, 18), glove, [0, -0.025, 0.005],
+    [0.10, 0, 0], [0.075, 0.082, 0.070]);
   palm.castShadow = false;
-  add(mitten, new THREE.SphereGeometry(1, 16, 12), glove, [0.002, -0.062, -0.040],
-    [0.55, 0, 0], [0.068, 0.058, 0.056]);
-  const thumb = add(mitten, new THREE.CapsuleGeometry(0.026, 0.046, 4, 12), glove,
-    [-0.066, 0.004, -0.030], [0.35, 0, 0.95]);
+  // finger band curling over the top of the ball
+  const knuckle = add(mitten, new THREE.CapsuleGeometry(0.026, 0.070, 5, 12), glove,
+    [0.000, 0.172, 0.068], [0.10, 0, Math.PI / 2]);
+  knuckle.castShadow = false;
+  // thumb pressed against the near-left side of the ball
+  const thumb = add(mitten, new THREE.CapsuleGeometry(0.029, 0.050, 5, 12), glove,
+    [-0.045, 0.060, 0.045], [0.25, 0, 0.95]);
   thumb.castShadow = false;
-  add(hand, new THREE.TorusGeometry(0.062, 0.010, 6, 16), trim, [0, 0.030, -0.004],
-    [Math.PI / 2, 0, 0], [1, 0.9, 1]);
 
-  // snowball with clumps, resting in the palm
+  // snowball, nested in the palm and partly covered by the fingers
   const ball = new THREE.Group();
   hand.add(ball);
-  ball.position.set(0, 0.105, -0.085);
-  const core = add(ball, new THREE.IcosahedronGeometry(0.094, 2), snowMat, [0, 0, 0]);
+  ball.position.set(0.000, 0.105, 0.045);
+  const core = add(ball, new THREE.IcosahedronGeometry(0.075, 2), snowMat, [0, 0, 0]);
   core.castShadow = false;
   for (let i = 0; i < 7; i++) {
-    const a = Math.random() * Math.PI * 2, r = 0.055 + Math.random() * 0.045;
-    add(ball, new THREE.SphereGeometry(0.020 + Math.random() * 0.018, 7, 6), snowMat,
-      [Math.cos(a) * r, (Math.random() - 0.5) * 0.10, Math.sin(a) * r]);
+    const a = Math.random() * Math.PI * 2, r = 0.044 + Math.random() * 0.034;
+    add(ball, new THREE.SphereGeometry(0.016 + Math.random() * 0.014, 7, 6), snowMat,
+      [Math.cos(a) * r, (Math.random() - 0.5) * 0.08, Math.sin(a) * r]);
   }
   ball.visible = false;
 
@@ -1439,21 +1498,21 @@ export function createViewModel(look) {
     mitten.scale.setScalar(1 + charge * 0.03 - openAmount * 0.05);
 
     ball.visible = !(throwT > 0.26 && throwT < 0.82);
-    const s = 0.62 + charge * 0.46;
+    const s = 0.85 + charge * 0.25;
     // squeeze the snow as the grip tightens, stretch it on release
     const stretch = throwT > 0.26 && throwT < 0.5 ? (1 - (throwT - 0.26) / 0.24) * 0.10 : 0;
     ball.scale.set(s * (1 - charge * 0.04 - stretch * 0.3), s * (1 + charge * 0.06 + stretch), s * (1 - charge * 0.04));
-    ball.position.z = -0.085 - charge * 0.03;
-    ball.position.y = 0.105 - charge * 0.012;
+    ball.position.z = 0.045 - charge * 0.012;
+    ball.position.y = 0.105 - charge * 0.008;
     ball.rotation.set(charge * 2.6, charge * 1.7, 0);
 
     // arm pulls back and down as the throw charges; the pivot itself moves
     // towards the middle on narrow screens so the hand never leaves the frame
     armPivot.rotation.set(charge * 0.10, 0, 0);
     armPivot.position.set(
-      (0.46 - charge * 0.035 + swayX * 0.002) * spread * spread,
-      -0.30 - charge * 0.035 + swayY * 0.002,
-      -0.78 + charge * 0.045
+      (0.38 - charge * 0.030 + swayX * 0.002) * spread * spread,
+      -0.26 - charge * 0.032 + swayY * 0.002,
+      -0.70 + charge * 0.040
     );
 
   }
