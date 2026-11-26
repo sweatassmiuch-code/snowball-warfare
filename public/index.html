@@ -23,6 +23,7 @@
     <div class="chip perf hidden" id="perfChip" title="FPS-Anzeige mit F umschalten"><span class="label">FPS</span><b id="fpsVal">–</b><span id="fpsScale" class="tiny">1.00×</span></div>
     <div class="grow"></div>
     <button class="chip action" id="muteBtn">TON&nbsp;AN</button>
+    <button class="chip action touch-only" id="boardBtn">LISTE</button>
     <button class="chip action" id="menuBtn">MENÜ</button>
   </div>
 
@@ -44,6 +45,14 @@
     <div id="hint">WASD bewegen · SHIFT sprinten (Ausdauer) · LEERTASTE springen · MAUS zielen · LINKSKLICK halten &amp; loslassen zum Werfen</div>
     <div id="staminaWrap" aria-hidden="true"><i id="staminaFill"></i></div>
     <div id="stance">1 TREFFER &middot; AUS</div>
+  </div>
+
+  <div id="touch">
+    <div id="stickZone"><div id="stickBase"><i id="stickKnob"></i></div></div>
+    <button id="jumpBtn" class="touch-btn" type="button">SPRUNG</button>
+    <button id="fireBtn" class="touch-btn fire" type="button">
+      <i class="fire-fill" id="fireFill"></i><span>WERFEN</span>
+    </button>
   </div>
 
   <div id="toast"></div>

@@ -15,7 +15,7 @@ läuft auf jedem Static-Host (Vercel, GitHub Pages, Netlify …).
 |---|---|
 | **Ziel** | 15 Eliminierungen pro Runde |
 | **Treffer** | Ein Körpertreffer schaltet den Gegner aus |
-| **Wurf** | Linksklick halten lädt die Wucht auf, loslassen wirft – währenddessen friert die Welt ein (Zeitlupe) |
+| **Wurf** | Linksklick (am Handy: WERFEN) halten lädt die Wucht auf, loslassen wirft – je länger du hältst, desto schneller und weiter fliegt der Ball. Das Match läuft dabei in Echtzeit weiter |
 | **Zielhilfe** | Beim Aufladen zeigt eine gepunktete Bahn samt Aufschlagring die echte Flugkurve (Schwerkraft, Luftwiderstand, Wind) |
 | **Respawn** | Automatisch nach 3,2 Sekunden |
 | **Karte** | Hügel, dichter Fichtenwald, Holzhütte, gefrorener See |
@@ -146,7 +146,8 @@ snowball-war/
   und Oberkörper-Gegendrehung, Armpendel mit Ellbogenbeuge, Lean in Kurven, Blinzeln,
   Atem-Idle mit gelegentlichem Blick, Wurf in Schlüsselposen (Ausholen → Schnapp → Nach-
   schwingen) und Treffer-Flinch; alle Übergänge werden weich geblendet.
-- **Game Feel:** Zeitlupen-Freeze beim Aufladen, Ziellinie mit Aufschlagring, FOV-Kick,
+- **Mobile:** virtueller Joystick links, Wischen zum Zielen, WERFEN-Knopf mit Auflade-Anzeige und Sprungtaste – kein Pointer Lock nötig.
+- **Game Feel:** Fokus-Vignette beim Aufladen, Ziellinie mit Aufschlagring, FOV-Kick,
   Kamera-Recoil, Landestaub, Fußspuren und Atemwolken.
 - **Sound:** Wind, Schritte, Wurf, Einschläge und UI-Töne live per WebAudio synthetisiert.
 

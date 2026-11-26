@@ -15,7 +15,10 @@ import { hostGame, joinGame } from './net.js';
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 const DEBUG = new URLSearchParams(location.search).has('debug');
-const hasMouse = () => document.pointerLockElement === canvas || (DEBUG && !!window.__sbw?.forceInput);
+// Touch screens never get pointer lock, so touch mode is its own way in.
+const hasMouse = () => document.pointerLockElement === canvas
+  || (DEBUG && !!window.__sbw?.forceInput)
+  || (G.touch && G.mode === 'playing');
 const ui = {
   hud: $('hud'), menu: $('menu'), loading: $('loading'), loadingText: $('loadingText'),
   nameInput: $('nameInput'), hostBtn: $('hostBtn'), joinBtn: $('joinBtn'), joinCode: $('joinCode'),
@@ -33,7 +36,10 @@ const ui = {
   preview: $('preview'), lookSummary: $('lookSummary'), randomLook: $('randomLook'),
   fpsToggle: $('fpsToggle'), swJacket: $('swJacket'), swScarf: $('swScarf'),
   swHat: $('swHat'), swSkin: $('swSkin'), optionsBtn: $('optionsBtn'),
-  optionsPanel: $('optionsPanel'), optionsClose: $('optionsClose')
+  optionsPanel: $('optionsPanel'), optionsClose: $('optionsClose'),
+  hint: $('hint'), stickZone: $('stickZone'), stickBase: $('stickBase'),
+  stickKnob: $('stickKnob'), fireBtn: $('fireBtn'), fireFill: $('fireFill'), jumpBtn: $('jumpBtn'),
+  boardBtn: $('boardBtn')
 };
 
 // ---------------------------------------------------------------------------
@@ -186,7 +192,7 @@ const post = (() => {
         float l2 = dot(col, vec3(0.299, 0.587, 0.114));
         col = mix(vec3(l2), col, 1.12);
 
-        // focus freeze: cold tunnel vision with the bloom pushed forward
+        // focus while winding up: cold tunnel vision with the bloom pushed forward
         col = mix(col, col * vec3(0.86, 0.96, 1.12), uFocus * 0.55);
         col += bloom * uFocus * 0.22;
 
@@ -329,6 +335,7 @@ const G = {
   deathT: 0,
   charging: false,
   charge: 0,
+  touch: false,
   cooldown: 0,
   throwSeq: 0,
   lastState: 0,
@@ -460,7 +467,10 @@ ui.roomChip.addEventListener('click', copyCode);
 ui.copyCode.addEventListener('click', copyCode);
 ui.menuBtn.addEventListener('click', () => {
   if (document.pointerLockElement) document.exitPointerLock();
-  else openPause();
+  else {
+    if (G.touch && G.mode === 'playing') G.mode = 'paused';
+    openPause();
+  }
 });
 ui.leaveBtn.addEventListener('click', leaveGame);
 ui.resumeBtn.addEventListener('click', resumeGame);
@@ -1223,8 +1233,11 @@ function openPause(first = false) {
   ui.resumeBtn.textContent = first ? 'EINSATZ STARTEN' : 'WEITERSPIELEN';
   ui.pause.querySelector('h2').textContent = first ? 'BEREIT' : 'PAUSE';
   ui.pause.querySelector('p').textContent = first
-    ? 'Klicke, um die Maus zu steuern. Esc öffnet später die Pause.'
+    ? (G.touch
+        ? 'Joystick links bewegt, FINGER auf dem Bild zieht die Sicht, WERFEN halten lädt die Wucht.'
+        : 'Klicke, um die Maus zu steuern. Esc öffnet später die Pause.')
     : 'Das Match läuft weiter. Du bist verwundbar.';
+  releaseCharge(true);
   ui.scoreboard.classList.add('hidden');
 }
 
@@ -1236,6 +1249,11 @@ function resumeGame() {
   audio.init();
   audio.setVolume(settings.vol);
   closePause();
+  if (G.touch) {
+    // no pointer lock on a touch screen: the stick and swipe drive the camera
+    G.mode = 'playing';
+    return;
+  }
   const p = canvas.requestPointerLock();
   if (p && p.catch) p.catch(() => { /* fallback below */ });
   setTimeout(() => {
@@ -1257,6 +1275,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 canvas.addEventListener('click', () => {
+  if (G.touch) return;
   if (G.session && G.mode === 'playing' && document.pointerLockElement !== canvas) {
     canvas.requestPointerLock();
   }
@@ -1284,10 +1303,7 @@ window.addEventListener('keydown', (e) => {
   if (['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(key)) e.preventDefault();
 
   if (key === 'Tab') {
-    if (G.session && !G.dead) {
-      ui.scoreboard.classList.remove('hidden');
-      renderScoreboard(true);
-    }
+    if (!G.dead) toggleScoreboard(true);
     return;
   }
   if (key === 'Escape') {
@@ -1313,53 +1329,207 @@ window.addEventListener('keydown', (e) => {
 
 window.addEventListener('keyup', (e) => {
   G.keys.delete(e.code);
-  if (e.code === 'Tab') {
-    ui.scoreboard.classList.add('hidden');
-    updateScoreboardVisibility();
-  }
+  if (e.code === 'Tab') toggleScoreboard(false);
 });
 
 window.addEventListener('blur', () => {
   G.keys.clear();
-  G.charging = false;
-  G.charge = 0;
+  releaseCharge(true);
 });
 
 document.addEventListener('mousemove', (e) => {
+  // touch screens turn the view with the finger; ignore synthetic mouse moves
+  if (G.touch && document.pointerLockElement !== canvas) return;
   if (!hasMouse()) return;
-  if (G.mode !== 'playing') return;
-  const s = 0.0021 * settings.sens;
-  G.yaw -= e.movementX * s;
-  G.pitch -= e.movementY * s;
-  G.pitch = Math.max(-1.5, Math.min(1.5, G.pitch));
-  G.mouseSwayX = THREE.MathUtils.clamp(G.mouseSwayX + e.movementX * 0.05, -12, 12);
-  G.mouseSwayY = THREE.MathUtils.clamp(G.mouseSwayY + e.movementY * 0.05, -12, 12);
+  turnView(e.movementX, e.movementY, 0.0021);
 });
 
-document.addEventListener('mousedown', (e) => {
-  if (e.button !== 0) return;
-  audio.init();
+function startCharge() {
   if (G.mode !== 'playing' || !G.session || G.dead) return;
   if (!hasMouse()) return;
-  if (G.cooldown > 0) return;
+  if (G.cooldown > 0 || G.charging) return;
   G.charging = true;
   G.charge = 0;
   ui.chargeRing.classList.add('active');
   ui.chargeLabel.classList.add('show');
+}
+
+function releaseCharge(cancel = false) {
+  if (!G.charging) return;
+  G.charging = false;
+  if (cancel) {
+    G.charge = 0;
+    ui.chargeRing.classList.remove('active');
+    ui.chargeLabel.classList.remove('show');
+    ui.chargeWrap.classList.remove('full');
+    if (ui.fireFill) ui.fireFill.style.height = '0%';
+    return;
+  }
+  throwSnowball();
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  // a tap synthesises mouse events but is handled by the on-screen button
+  if (e.sourceCapabilities?.firesTouchEvents) return;
+  if (G.touch && document.pointerLockElement !== canvas) return;
+  audio.init();
+  startCharge();
 });
 
 document.addEventListener('mouseup', (e) => {
   if (e.button !== 0) return;
-  if (!G.charging) return;
-  G.charging = false;
-  throwSnowball();
+  releaseCharge();
 });
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------------------------------------------------------------------------
+// Touch input: left thumb steers, right thumb holds WERFEN to build power and
+// releases to throw, swiping the screen aims. A real mouse flips back to the
+// desktop layout, so touchscreen laptops keep using both.
+// ---------------------------------------------------------------------------
+const DESKTOP_HINT = ui.hint?.textContent || '';
+const TOUCH_HINT = 'JOYSTICK LINKS STEUERN · BILD ZIEHEN ZUM ZIELEN · WERFEN HALTEN = MEHR WUCHT';
+const STICK_RADIUS = 54;
+
+const touchInput = { active: false, x: 0, y: 0, len: 0 };
+const stick = { id: null, baseX: 0, baseY: 0 };
+const look = { id: null, x: 0, y: 0 };
+
+function turnView(dx, dy, sens) {
+  if (G.mode !== 'playing') return;
+  const s = sens * settings.sens;
+  G.yaw -= dx * s;
+  G.pitch = THREE.MathUtils.clamp(G.pitch - dy * s, -1.5, 1.5);
+  G.mouseSwayX = THREE.MathUtils.clamp(G.mouseSwayX + dx * 0.05, -12, 12);
+  G.mouseSwayY = THREE.MathUtils.clamp(G.mouseSwayY + dy * 0.05, -12, 12);
+}
+
+function setInputMode(touch) {
+  if (document.body.classList.contains('is-touch') === touch) return;
+  G.touch = touch;
+  document.body.classList.toggle('is-touch', touch);
+  if (ui.hint) ui.hint.textContent = touch ? TOUCH_HINT : DESKTOP_HINT;
+  resetStick();
+  ui.fireBtn?.classList.remove('down');
+  releaseCharge(true);
+}
+
+function moveStick(dx, dy) {
+  const dist = Math.hypot(dx, dy);
+  const k = dist > STICK_RADIUS ? STICK_RADIUS / dist : 1;
+  const x = dx * k, y = dy * k;
+  ui.stickKnob.style.transform = `translate(-50%, -50%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+  touchInput.x = x / STICK_RADIUS;
+  touchInput.y = y / STICK_RADIUS;
+  touchInput.len = Math.min(1, dist / STICK_RADIUS);
+  touchInput.active = touchInput.len > 0.08;
+}
+
+function resetStick() {
+  stick.id = null;
+  touchInput.active = false;
+  touchInput.x = touchInput.y = touchInput.len = 0;
+  if (!ui.stickKnob) return;
+  moveStick(0, 0);
+  ui.stickBase.classList.remove('on');
+}
+
+// Every touch surface starts the same way: touch layout on, audio unlocked.
+function beginTouch() {
+  setInputMode(true);
+  audio.init();
+}
+
+// Shared press helper: touch pointers only, so a mouse keeps the desktop path.
+function onPress(el, down, up = () => {}) {
+  if (!el) return;
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    e.preventDefault();
+    beginTouch();
+    down();
+  });
+  for (const ev of ['pointerup', 'pointercancel']) {
+    el.addEventListener(ev, (e) => {
+      if (e.pointerType === 'mouse') return;
+      e.preventDefault();
+      up(ev === 'pointercancel');
+    });
+  }
+}
+
+// A real mouse always takes the layout back (touchscreen laptops).
+for (const type of ['pointerdown', 'pointermove']) {
+  window.addEventListener(type, (e) => { if (e.pointerType === 'mouse') setInputMode(false); }, { passive: true });
+}
+if (window.matchMedia?.('(pointer: coarse)').matches) setInputMode(true);
+window.addEventListener('touchstart', () => setInputMode(true), { once: true, passive: true });
+
+ui.stickZone?.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' || stick.id !== null) return;
+  e.preventDefault();
+  beginTouch();
+  stick.id = e.pointerId;
+  stick.baseX = e.clientX;
+  stick.baseY = e.clientY;
+  const rect = ui.stickZone.getBoundingClientRect();
+  ui.stickBase.style.left = (e.clientX - rect.left) + 'px';
+  ui.stickBase.style.top = (e.clientY - rect.top) + 'px';
+  ui.stickBase.classList.add('on');
+  moveStick(0, 0);
+  try { ui.stickZone.setPointerCapture(e.pointerId); } catch {}
+});
+
+ui.stickZone?.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== stick.id) return;
+  e.preventDefault();
+  moveStick(e.clientX - stick.baseX, e.clientY - stick.baseY);
+});
+
+for (const ev of ['pointerup', 'pointercancel']) {
+  ui.stickZone?.addEventListener(ev, (e) => {
+    if (e.pointerId === stick.id) resetStick();
+  });
+}
+
+// Swipe anywhere off the pad to look around; a locked mouse owns the camera.
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' || look.id !== null || document.pointerLockElement) return;
+  beginTouch();
+  look.id = e.pointerId;
+  look.x = e.clientX;
+  look.y = e.clientY;
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== look.id) return;
+  turnView(e.clientX - look.x, e.clientY - look.y, 0.0038);
+  look.x = e.clientX;
+  look.y = e.clientY;
+});
+
+for (const ev of ['pointerup', 'pointercancel']) {
+  canvas.addEventListener(ev, (e) => {
+    if (e.pointerId === look.id) look.id = null;
+  });
+}
+
+onPress(ui.fireBtn,
+  () => { ui.fireBtn.classList.add('down'); startCharge(); },
+  (cancelled) => { ui.fireBtn.classList.remove('down'); releaseCharge(cancelled); });
+
+onPress(ui.jumpBtn, () => { if (!G.dead) G.jumpBuf = 0.16; });
+
+// ---------------------------------------------------------------------------
 // Throw
 // ---------------------------------------------------------------------------
+// Charge feel: a quick tap lobs a short, slow ball; a full wind-up flies far
+// and fast. Throw and aim arc read the same curve.
+const CHARGE_TIME = 1.25;
+const throwSpeed = (power) => 14 + power * 28;
+
 function throwSnowball() {
   const power = Math.min(1, G.charge);
   G.charge = 0;
@@ -1369,7 +1539,7 @@ function throwSnowball() {
   if (!G.session || G.dead || G.mode !== 'playing') return;
 
   // a rushed throw is weaker and less accurate than a full wind-up
-  const speed = 15 + power * 19;
+  const speed = throwSpeed(power);
   const moveSpread = Math.min(1, Math.hypot(moveDir.x, moveDir.z) / PLAYER.sprint);
   const spread = 0.004 + moveSpread * 0.017 + (1 - power) * 0.011 + (G.grounded ? 0 : 0.008);
 
@@ -1418,8 +1588,8 @@ function spawnProjectileVisual(id, o, v) {
 }
 
 // ---------------------------------------------------------------------------
-// Aim arc: while the world is frozen for a throw, draw where the snowball will
-// actually go (gravity, drag and wind included) plus a landing ring.
+// Aim arc: while a throw is wound up, draw where the snowball will actually go
+// (gravity, drag and wind included) plus a landing ring.
 // ---------------------------------------------------------------------------
 const aim = (() => {
   const N = 64;
@@ -1471,7 +1641,7 @@ const aim = (() => {
     camera.getWorldDirection(dir);
     p.copy(camera.position).addScaledVector(dir, 0.46);
     p.y -= 0.10;
-    v.copy(dir).multiplyScalar(15 + power * 19);
+    v.copy(dir).multiplyScalar(throwSpeed(power));
     v.x += WIND.x * 0.25;
     v.z += WIND.z * 0.25;
 
@@ -1549,8 +1719,9 @@ function updateLocalPlayer(dt, realDt = dt) {
     const b = G.keys.has('KeyS') ? 1 : 0;
     const l = G.keys.has('KeyA') ? 1 : 0;
     const r = G.keys.has('KeyD') ? 1 : 0;
-    const fwd = f - b;
-    const side = r - l;
+    // the touch stick is analogue: forward is up on the pad
+    const fwd = THREE.MathUtils.clamp(f - b + (touchInput.active ? -touchInput.y : 0), -1, 1);
+    const side = THREE.MathUtils.clamp(r - l + (touchInput.active ? touchInput.x : 0), -1, 1);
     if (fwd || side) {
       const sin = Math.sin(G.yaw), cos = Math.cos(G.yaw);
       wishX = -sin * fwd + cos * side;
@@ -1561,7 +1732,8 @@ function updateLocalPlayer(dt, realDt = dt) {
   }
 
   // --- sprint stamina -----------------------------------------------------
-  const wantSprint = (G.keys.has('ShiftLeft') || G.keys.has('ShiftRight')) && alive && G.mode === 'playing';
+  const touchSprint = touchInput.active && touchInput.len > 0.92;
+  const wantSprint = ((G.keys.has('ShiftLeft') || G.keys.has('ShiftRight')) || touchSprint) && alive && G.mode === 'playing';
   const wantsToMove = Math.hypot(wishX, wishZ) > 0.01;
   const sprinting = wantSprint && wantsToMove && G.stamina > 0.02 && G.staminaLock <= 0;
 
@@ -1815,7 +1987,7 @@ function sendState() {
   if (now - G.lastInput < 50) return;
   G.lastInput = now;
   const moving = Math.hypot(moveDir.x, moveDir.z) > 0.6;
-  const sprinting = G.keys.has('ShiftLeft') || G.keys.has('ShiftRight');
+  const sprinting = G.keys.has('ShiftLeft') || G.keys.has('ShiftRight') || (touchInput.active && touchInput.len > 0.92);
   G.session.input({
     t: 's',
     p: [Number(G.pos.x.toFixed(2)), Number(G.pos.y.toFixed(2)), Number(G.pos.z.toFixed(2))],
@@ -1860,13 +2032,15 @@ function updateHud(dt) {
   G.spread += (targetSpread - G.spread) * Math.min(1, dt * 9);
   ui.chargeWrap.style.setProperty('--spread', G.spread.toFixed(3));
 
+  if (ui.fireFill) ui.fireFill.style.height = (G.charging ? G.charge * 100 : 0).toFixed(1) + '%';
+
   if (G.charging && G.mode === 'playing') {
-    G.charge = Math.min(1, G.charge + dt / 0.85);
+    G.charge = Math.min(1, G.charge + dt / CHARGE_TIME);
     const c = 276.5 * (1 - G.charge);
     ui.chargeArc.style.strokeDashoffset = String(c);
     ui.chargeWrap.classList.toggle('full', G.charge > 0.985);
     const power = G.charge > 0.985 ? 'MAXIMALE WUCHT' : 'WUCHT ' + Math.round(G.charge * 100) + '%';
-    G.chargeLabel.textContent = power + ' · ZEITLUPE';
+    ui.chargeLabel.textContent = power;
   }
   post.composite.uniforms.uFocus.value = G.focus;
 
@@ -1903,6 +2077,14 @@ function renderScoreboard(force) {
       <span class="d">${r.d}</span>
     </div>`;
   }).join('');
+}
+
+// Also driven by the on-screen LISTE button: tapping the panel closes it again.
+function toggleScoreboard(open) {
+  if (!G.session) return;
+  const show = open ?? ui.scoreboard.classList.contains('hidden');
+  ui.scoreboard.classList.toggle('hidden', !show);
+  if (show) renderScoreboard(true);
 }
 
 function updateScoreboardVisibility() {
@@ -1960,12 +2142,12 @@ function loop(fixedDt) {
   dt = Math.min(dt, 0.05);
   elapsed += dt;
 
-  // Focus freeze: while a throw is wound up the whole world holds still,
-  // then snaps back into motion the moment the ball leaves the hand.
+  // Winding up a throw must not stall the match: the focus value only drives
+  // the cold tunnel-vision grade, the simulation always runs at full speed.
   const wantFocus = G.charging && !!G.session && G.mode === 'playing' && !G.dead;
   G.focus += ((wantFocus ? 1 : 0) - G.focus) * Math.min(1, dt * (wantFocus ? 16 : 9));
   if (G.focus < 0.002) G.focus = 0;
-  const worldDt = dt * (1 - G.focus * 0.97);
+  const worldDt = dt;
 
   if (G.session) {
     G.session.tick(worldDt);
@@ -2014,6 +2196,9 @@ window.addEventListener('pointerdown', () => {
   audio.setVolume(settings.vol);
 }, { once: true });
 
+ui.boardBtn?.addEventListener('click', () => { audio.ui(); toggleScoreboard(); });
+ui.scoreboard.addEventListener('click', () => toggleScoreboard(false));
+
 // Keep audio volume in sync
 audio.setVolume(settings.vol);
 
@@ -2045,8 +2230,8 @@ if (DEBUG) {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     G.keys.clear();
-    G.charging = false;
-    G.charge = 0;
-    ui.chargeRing.classList.remove('active');
+    resetStick();
+    ui.fireBtn?.classList.remove('down');
+    releaseCharge(true);
   }
 });
