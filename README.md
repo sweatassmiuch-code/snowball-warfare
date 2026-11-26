@@ -26,7 +26,8 @@ läuft auf jedem Static-Host (Vercel, GitHub Pages, Netlify …).
 | Taste | Aktion |
 |---|---|
 | `W A S D` | Bewegen |
-| `Shift` | Sprinten |
+| `Shift` | Sprint umschalten (kurz tippen) |
+| `Ctrl` | Ducken umschalten (kurz tippen) · während des Sprints: Slide |
 | `Space` | Springen |
 | `Maus` | Zielen |
 | `Linke Maustaste` | Schneeball aufladen (Welt friert ein, Ziellinie erscheint) & werfen |
@@ -75,8 +76,9 @@ npm start            # http://localhost:5173
 ```
 
 Der Server (`serve.mjs`) liefert nur Dateien aus `public/` aus.
-Three.js und PeerJS liegen bereits gebündelt unter `public/vendor/`,
-im Spielbetrieb wird also nichts von einem CDN geladen.
+Three.js, PeerJS und die UI-Schriften (Knewave, Barlow Condensed, DM Sans)
+liegen bereits gebündelt unter `public/vendor/`, im Spielbetrieb wird also
+nichts von einem CDN geladen.
 
 ### Debug-Modus
 

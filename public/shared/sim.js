@@ -102,7 +102,8 @@ export class GameSim {
     }
     if (Number.isFinite(msg.y)) p.yaw = msg.y;
     if (Number.isFinite(msg.pitch)) p.pitch = Math.max(-1.5, Math.min(1.5, msg.pitch));
-    if (typeof msg.a === 'number') p.anim = Math.max(0, Math.min(2, msg.a | 0));
+    // 0 idle, 1 walk, 2 sprint, 3 crouch idle, 4 crouch walk, 5 slide
+    if (typeof msg.a === 'number') p.anim = Math.max(0, Math.min(5, msg.a | 0));
   }
 
   throwBall(id, seq, o, v, now = Date.now()) {

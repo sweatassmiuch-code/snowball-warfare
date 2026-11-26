@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>SNOWBALL WARFARE — Ein Treffer. Tot.</title>
 <meta name="description" content="Cartoon-Multiplayer-Schneeballshooter im Schneesturm. Ein Treffer und du bist raus." />
-<meta name="theme-color" content="#0b1520" />
+<meta name="theme-color" content="#102b35" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9D%84%3C/text%3E%3C/svg%3E" />
+<link rel="preload" as="font" type="font/woff2" href="./vendor/fonts/knewave-400.woff2" crossorigin />
+<link rel="preload" as="font" type="font/woff2" href="./vendor/fonts/dm-sans-var.woff2" crossorigin />
 <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -41,7 +43,7 @@
   <div id="chargeLabel">SCHNEEBALL</div>
 
   <div id="bottomBar">
-    <div id="hint">WASD bewegen · SHIFT sprinten (Ausdauer) · LEERTASTE springen · MAUS zielen · LINKSKLICK halten &amp; loslassen zum Werfen</div>
+    <div id="hint">SHIFT SPRINT &middot; CTRL DUCKEN / SLIDE &middot; LMB WERFEN &middot; TAB RANGLISTE</div>
     <div id="staminaWrap" aria-hidden="true"><i id="staminaFill"></i></div>
     <div id="stance">1 TREFFER &middot; AUS</div>
   </div>
@@ -62,79 +64,87 @@
 </div>
 
 <!-- ===================== START MENU ===================== -->
-<div id="menu" class="fullscreen menu-v3">
-  <div class="menu-bg"></div>
-  <div class="v3-aurora" aria-hidden="true"></div>
-  <div class="v3-snow" aria-hidden="true"></div>
+<div id="menu" class="fullscreen menu-c7">
+  <div class="menu-bg" aria-hidden="true"></div>
+  <div class="c7-haze" aria-hidden="true"></div>
 
-  <header class="v3-head">
-    <div class="v3-brand">
-      <span class="v3-mark">&#10052;</span>
-      <div>
-        <h1>SNOWBALL<span>WARFARE</span></h1>
-        <p>Ein Treffer &ndash; und du bist raus.</p>
-      </div>
-    </div>
-    <div class="v3-head-right">
-      <span class="v3-pill"><i class="dot-live"></i> P2P &middot; OHNE ACCOUNT</span>
-      <button class="v3-gear" id="optionsBtn" title="Optionen" aria-label="Optionen">&#9881;</button>
+  <header class="c7-top">
+    <div class="c7-wordmark"><i>&#10052;</i> SNOWBALL <span>WARFARE</span></div>
+    <div class="c7-top-meta">
+      <span class="c7-live"><i class="dot-live"></i> P2P &middot; OHNE ACCOUNT</span>
+      <button class="c7-gear" id="optionsBtn" title="Optionen" aria-label="Optionen">&#9881;</button>
     </div>
   </header>
 
-  <main class="v3-stage">
-    <div class="v3-spot"></div>
-    <div class="v3-floor"></div>
-    <div class="v3-glow"></div>
-    <canvas id="preview"></canvas>
-    <div class="v3-badges">
-      <span><i class="dot-live"></i>1 TREFFER &middot; AUS</span>
-      <span>2&ndash;6 SPIELER</span>
-      <span>P2P</span>
-    </div>
-  </main>
+  <main class="c7-panel">
+    <div class="c7-eyebrow"><i></i> SEASON 01 &middot; SCHNEEBALLSHOOTER</div>
+    <h1 class="c7-title">SNOWBALL<br /><em>WARFARE</em></h1>
 
-  <aside class="v3-play">
-    <button class="play-btn" id="hostBtn">
-      <span class="play-tri">&#9654;</span>
-      <span class="play-word">PLAY</span>
-      <small>RAUM ERSTELLEN</small>
-    </button>
-    <div class="v3-play-key"><kbd>ENTER</kbd></div>
-    <div id="menuStatus" class="status">Bereit.</div>
-  </aside>
-
-  <footer class="v3-dock">
-    <div class="v3-dock-head">
-      <b>DEIN CHARAKTER</b>
-      <small id="lookSummary">Blau &middot; Weiss &middot; Hell</small>
-      <button id="randomLook">ZUFALL</button>
+    <div class="c7-stats">
+      <div><b>1</b><span>TREFFER &middot; AUS</span></div>
+      <div><b>6</b><span>SPIELER MAX</span></div>
+      <div><b>0&ndash;5</b><span>BOTS</span></div>
     </div>
 
-    <label class="v3-field v3-name">
-      <span>DEIN NAME</span>
+    <label class="c7-identity">
+      <span class="c7-label">DEIN NAME</span>
       <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
     </label>
 
-    <div class="v3-looks">
-      <div class="v3-look"><span>JACKE</span><div class="swatches" id="swJacket"></div></div>
-      <div class="v3-look"><span>KRAGEN</span><div class="swatches" id="swScarf"></div></div>
-      <div class="v3-look"><span>M&Uuml;TZE</span><div class="swatches" id="swHat"></div></div>
-      <div class="v3-look"><span>HAUT</span><div class="swatches" id="swSkin"></div></div>
-    </div>
+    <button class="c7-start" id="hostBtn">
+      <span class="c7-start-main">SPIELEN<small>RAUM ERSTELLEN</small></span>
+      <span class="c7-start-key"><kbd>ENTER</kbd></span>
+    </button>
+    <div id="menuStatus" class="c7-status">Bereit.</div>
 
-    <div class="v3-field v3-join">
-      <span>RAUMCODE</span>
-      <div class="v3-join-row">
+    <div class="c7-join">
+      <span class="c7-label">RAUMCODE</span>
+      <div class="c7-join-row">
         <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
         <button id="joinBtn">BEITRETEN</button>
       </div>
     </div>
+
+    <div class="c7-locker">
+      <div class="c7-locker-head">
+        <b>DEIN LOOK</b>
+        <small id="lookSummary">Blau &middot; Weiss &middot; Hell</small>
+        <button id="randomLook">ZUFALL</button>
+      </div>
+      <div class="c7-looks">
+        <div class="c7-look"><span>JACKE</span><div class="swatches" id="swJacket"></div></div>
+        <div class="c7-look"><span>KRAGEN</span><div class="swatches" id="swScarf"></div></div>
+        <div class="c7-look"><span>M&Uuml;TZE</span><div class="swatches" id="swHat"></div></div>
+        <div class="c7-look"><span>HAUT</span><div class="swatches" id="swSkin"></div></div>
+      </div>
+    </div>
+  </main>
+
+  <section class="c7-stage" aria-label="Charakter-Vorschau">
+    <div class="c7-stage-glow"></div>
+    <div class="c7-stage-floor"></div>
+    <canvas id="preview"></canvas>
+    <div class="c7-stage-tags">
+      <span><i class="dot-live"></i> LOBBY</span>
+    </div>
+    <div class="c7-stage-copy">DEIN RIDER<br /><small>LIVE-VORSCHAU</small></div>
+  </section>
+
+  <footer class="c7-foot">
+    <span>&copy; 2026 SNOWBALL WARFARE</span>
+    <span class="c7-foot-keys">
+      <kbd>SHIFT</kbd> SPRINT
+      <b>&middot;</b>
+      <kbd>CTRL</kbd> DUCKEN / SLIDE
+      <b>&middot;</b>
+      <kbd>LMB</kbd> WERFEN
+    </span>
   </footer>
 
-  <section class="v3-options hidden" id="optionsPanel">
-    <div class="v3-opt-head">
+  <section class="c7-options hidden" id="optionsPanel">
+    <div class="c7-opt-head">
       <b>OPTIONEN</b>
-      <button class="v3-gear" id="optionsClose" aria-label="Schliessen">&times;</button>
+      <button class="c7-gear" id="optionsClose" aria-label="Schliessen">&times;</button>
     </div>
     <label class="field">
       <span>QUALIT&Auml;T</span>
@@ -166,13 +176,15 @@
       <input type="checkbox" id="fpsToggle" />
       <span>FPS-ANZEIGE <kbd>F</kbd></span>
     </label>
-    <div class="v3-keys">
+    <div class="c7-keys">
       <div><kbd>WASD</kbd><span>Bewegen</span></div>
-      <div><kbd>SHIFT</kbd><span>Sprinten</span></div>
+      <div><kbd>SHIFT</kbd><span>Sprint tippen</span></div>
+      <div><kbd>CTRL</kbd><span>Ducken / Slide</span></div>
       <div><kbd>SPACE</kbd><span>Springen</span></div>
       <div><kbd>LMB</kbd><span>Werfen</span></div>
       <div><kbd>TAB</kbd><span>Rangliste</span></div>
       <div><kbd>ESC</kbd><span>Pause</span></div>
+      <div><kbd>M</kbd><span>Ton</span></div>
     </div>
   </section>
 
@@ -185,6 +197,7 @@
 <!-- ===================== PAUSE ===================== -->
 <div id="pause" class="fullscreen hidden">
   <div class="pause-card panel">
+    <div class="pause-kicker">MATCH H&Auml;LT AN</div>
     <h2>PAUSE</h2>
     <p>Das Match läuft weiter. Du bist verwundbar.</p>
     <div class="pause-actions">
@@ -194,7 +207,7 @@
     <div class="pause-controls">
       <span><kbd>ESC</kbd> Pause</span><span><kbd>TAB</kbd> Rangliste</span><span><kbd>M</kbd> Ton</span>
     </div>
-    <div class="pause-room">RAUMCODE <b id="pauseCode">-----</b> <button class="mini" id="copyCode">KOPIEREN</button></div>
+    <div class="pause-room"><span>RAUMCODE</span> <b id="pauseCode">-----</b> <button class="mini" id="copyCode">KOPIEREN</button></div>
   </div>
 </div>
 

@@ -361,7 +361,18 @@ const G = {
   spread: 0,
   lastNear: 0,
   lowFx: false,
-  focus: 0
+  focus: 0,
+  sprintToggle: false,
+  crouchToggle: false,
+  sliding: false,
+  slideT: 0,
+  slideDur: 0.92,
+  slideSpeed: 0,
+  slideDirX: 0,
+  slideDirZ: 0,
+  slideFx: 0,
+  crouchBlend: 0,
+  slideBlend: 0
 };
 
 const isPlaying = () => G.session && !G.dead && G.mode === 'playing';
@@ -467,7 +478,7 @@ ui.resumeBtn.addEventListener('click', resumeGame);
 
 function setMenuStatus(text, cls = '') {
   ui.menuStatus.textContent = text;
-  ui.menuStatus.className = 'status ' + cls;
+  ui.menuStatus.className = 'c7-status ' + cls;
 }
 
 function setLoading(on, text = 'Verbinde …') {
@@ -542,8 +553,8 @@ const preview = (() => {
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(31, 1, 0.05, 20);
-    camera.position.set(0, 1.05, 4.35);
-    camera.lookAt(0, 1.05, 0);
+    camera.position.set(0, 1.02, 5.0);
+    camera.lookAt(0, 0.96, 0);
 
     scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a3742, 1.9));
     const key = new THREE.DirectionalLight(0xfff3e4, 2.5);
@@ -989,6 +1000,9 @@ function dieSelf(killer) {
   G.killer = killer;
   G.charging = false;
   G.charge = 0;
+  G.sprintToggle = false;
+  G.crouchToggle = false;
+  G.sliding = false;
   G.desat = 0;
   G.flash = 0.8;
   viewmodel.setVisible(false);
@@ -1009,6 +1023,9 @@ function reviveSelf(entry) {
   viewmodel.setVisible(true);
   G.vy = 0;
   G.grounded = true;
+  G.sprintToggle = false;
+  G.crouchToggle = false;
+  G.sliding = false;
   if (entry) {
     G.pos.set(entry[1], entry[2], entry[3]);
     G.yaw = entry[4];
@@ -1088,6 +1105,60 @@ window.addEventListener('beforeunload', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Stance: sprint and crouch are taps, not holds. One tap flips the state, so
+// both hands stay free for aiming. Tapping crouch while sprinting turns the
+// run into a slide and leaves you crouched when the skid ends.
+// ---------------------------------------------------------------------------
+function stanceReady() {
+  return !!G.session && G.mode === 'playing' && !G.dead && G.spawned;
+}
+
+function toggleSprint() {
+  if (!stanceReady()) return;
+  G.sprintToggle = !G.sprintToggle;
+  if (G.sprintToggle) {
+    G.crouchToggle = false;
+    G.sliding = false;
+    G.slideT = 0;
+  }
+}
+
+function toggleCrouch() {
+  if (!stanceReady()) return;
+  if (G.sliding) {
+    G.sliding = false;
+    G.crouchToggle = true;
+    return;
+  }
+  const speed = Math.hypot(moveDir.x, moveDir.z);
+  if (G.sprintToggle && G.grounded && speed > PLAYER.walk * 0.8) {
+    startSlide(speed);
+    return;
+  }
+  G.crouchToggle = !G.crouchToggle;
+  if (G.crouchToggle) G.sprintToggle = false;
+}
+
+function startSlide(speed) {
+  if (speed > 0.6) {
+    G.slideDirX = moveDir.x / speed;
+    G.slideDirZ = moveDir.z / speed;
+  } else {
+    G.slideDirX = -Math.sin(G.yaw);
+    G.slideDirZ = -Math.cos(G.yaw);
+  }
+  G.sliding = true;
+  G.slideT = 0;
+  G.slideSpeed = Math.max(PLAYER.sprint, speed) * 1.12;
+  G.slideFx = 0;
+  G.crouchToggle = true;
+  G.sprintToggle = false;
+  G.shake = Math.max(G.shake, 0.02);
+  effects.spray(G.pos.x, G.pos.z, -G.slideDirX, -G.slideDirZ, 1.1);
+  audio.footstep(true);
+}
+
+// ---------------------------------------------------------------------------
 // Input
 // ---------------------------------------------------------------------------
 window.addEventListener('keydown', (e) => {
@@ -1119,6 +1190,14 @@ window.addEventListener('keydown', (e) => {
     showToast(settings.showFps ? 'FPS-Anzeige an' : 'FPS-Anzeige aus');
     return;
   }
+  if (key === 'ShiftLeft' || key === 'ShiftRight') {
+    toggleSprint();
+    return;
+  }
+  if (key === 'ControlLeft' || key === 'ControlRight') {
+    toggleCrouch();
+    return;
+  }
   if (key === 'Space') G.jumpBuf = 0.16;
   G.keys.add(key);
 });
@@ -1135,6 +1214,8 @@ window.addEventListener('blur', () => {
   G.keys.clear();
   G.charging = false;
   G.charge = 0;
+  G.sprintToggle = false;
+  G.sliding = false;
 });
 
 document.addEventListener('mousemove', (e) => {
@@ -1372,24 +1453,55 @@ function updateLocalPlayer(dt, realDt = dt) {
     }
   }
 
-  // --- sprint stamina -----------------------------------------------------
-  const wantSprint = (G.keys.has('ShiftLeft') || G.keys.has('ShiftRight')) && alive && G.mode === 'playing';
+  // --- stance: sprint and crouch are toggles ------------------------------
   const wantsToMove = Math.hypot(wishX, wishZ) > 0.01;
-  const sprinting = wantSprint && wantsToMove && G.stamina > 0.02 && G.staminaLock <= 0;
+  const sprinting = G.sprintToggle && wantsToMove && alive && G.mode === 'playing' &&
+    !G.crouchToggle && !G.sliding && G.stamina > 0.02 && G.staminaLock <= 0;
 
   if (sprinting) {
     G.stamina = Math.max(0, G.stamina - dt * 0.29);
-    if (G.stamina <= 0) G.staminaLock = 1.1;
+    if (G.stamina <= 0) { G.staminaLock = 1.1; G.sprintToggle = false; }
   } else {
     G.stamina = Math.min(1, G.stamina + dt * (wantsToMove ? 0.16 : 0.32));
   }
   G.staminaLock = Math.max(0, G.staminaLock - dt);
 
-  const maxSpeed = sprinting ? PLAYER.sprint : PLAYER.walk;
+  // --- slide --------------------------------------------------------------
+  // Tapping crouch while sprinting converts the run into a skid: the momentum
+  // stays, the body drops, and A/D carve the line instead of steering it.
+  let slideLean = 0;
+  if (G.sliding) {
+    G.slideT += dt;
+    const k = Math.min(1, G.slideT / G.slideDur);
+    if (!alive || G.mode !== 'playing' || !G.grounded || G.slideT >= G.slideDur) {
+      G.sliding = false;
+    } else {
+      const speed = G.slideSpeed * (1 - 0.62 * k * k);
+      const steer = (G.keys.has('KeyD') ? 1 : 0) - (G.keys.has('KeyA') ? 1 : 0);
+      if (steer) {
+        const a = steer * dt * 1.45;
+        const c = Math.cos(a), s = Math.sin(a);
+        const dx = G.slideDirX * c - G.slideDirZ * s;
+        const dz = G.slideDirX * s + G.slideDirZ * c;
+        G.slideDirX = dx; G.slideDirZ = dz;
+        slideLean = steer;
+      }
+      moveDir.x = G.slideDirX * speed;
+      moveDir.z = G.slideDirZ * speed;
+      G.slideFx -= dt;
+      if (G.slideFx <= 0) {
+        G.slideFx = 0.055;
+        effects.spray(G.pos.x, G.pos.z, -G.slideDirX, -G.slideDirZ, 0.85);
+        audio.footstep(true);
+      }
+    }
+  }
+
+  const maxSpeed = G.crouchToggle ? PLAYER.crouch : (sprinting ? PLAYER.sprint : PLAYER.walk);
   const accel = G.grounded ? 32 : 7.5;
 
   // steep ground pulls you downhill instead of letting you stand on a wall
-  if (alive && G.grounded) {
+  if (alive && G.grounded && !G.sliding) {
     const slope = terrainSlope(G.pos.x, G.pos.z);
     if (slope > 0.26) {
       const n = terrainNormal(G.pos.x, G.pos.z);
@@ -1399,13 +1511,15 @@ function updateLocalPlayer(dt, realDt = dt) {
     }
   }
 
-  moveDir.x += (wishX * maxSpeed - moveDir.x) * Math.min(1, accel * dt);
-  moveDir.z += (wishZ * maxSpeed - moveDir.z) * Math.min(1, accel * dt);
+  if (!G.sliding) {
+    moveDir.x += (wishX * maxSpeed - moveDir.x) * Math.min(1, accel * dt);
+    moveDir.z += (wishZ * maxSpeed - moveDir.z) * Math.min(1, accel * dt);
 
-  if (G.grounded && !wantsToMove) {
-    const f = Math.max(0, 1 - dt * 9);
-    moveDir.x *= f;
-    moveDir.z *= f;
+    if (G.grounded && !wantsToMove) {
+      const f = Math.max(0, 1 - dt * 9);
+      moveDir.x *= f;
+      moveDir.z *= f;
+    }
   }
 
   G.coyote = G.grounded ? 0.12 : Math.max(0, G.coyote - dt);
@@ -1418,6 +1532,9 @@ function updateLocalPlayer(dt, realDt = dt) {
     clampToWorld(G.pos);
 
     if (G.jumpBuf > 0 && G.coyote > 0 && G.mode === 'playing') {
+      // jumping stands you up out of a crouch or a slide
+      G.sliding = false;
+      G.crouchToggle = false;
       G.vy = 6.1;
       G.grounded = false;
       G.coyote = 0;
@@ -1452,14 +1569,21 @@ function updateLocalPlayer(dt, realDt = dt) {
   const speed = Math.hypot(moveDir.x, moveDir.z);
   const speedFactor = Math.min(1, speed / PLAYER.walk);
   G.bobT += dt * (2.2 + speed * 1.45);
-  const bobY = Math.sin(G.bobT * 2) * 0.028 * speedFactor;
-  const bobRoll = Math.sin(G.bobT) * 0.008 * speedFactor;
+  // crouch and slide are smoothed so a tap never pops the view
+  const crouchTarget = (G.crouchToggle || G.sliding) && alive ? 1 : 0;
+  G.crouchBlend += (crouchTarget - G.crouchBlend) * Math.min(1, dt * 12);
+  G.slideBlend += ((G.sliding ? 1 : 0) - G.slideBlend) * Math.min(1, dt * 10);
+  const stanceDrop = 0.60 * G.crouchBlend + 0.10 * G.slideBlend;
+  const bobScale = 1 - 0.55 * G.crouchBlend;
+
+  const bobY = Math.sin(G.bobT * 2) * 0.028 * speedFactor * bobScale;
+  const bobRoll = Math.sin(G.bobT) * 0.008 * speedFactor * bobScale;
 
   G.recoil *= Math.max(0, 1 - dt * 9);
   G.shake *= Math.max(0, 1 - dt * 6);
 
   G.landDip *= Math.max(0, 1 - dt * 7);
-  let eye = PLAYER.eye - G.landDip;
+  let eye = PLAYER.eye - G.landDip - stanceDrop;
 
   if (G.dead) {
     G.deathT = Math.min(1, G.deathT + dt * 1.8);
@@ -1468,7 +1592,8 @@ function updateLocalPlayer(dt, realDt = dt) {
     camera.rotation.z = 0.6 * k;
     G.pitch += (Math.min(1.2, G.pitch + 0.9) - G.pitch) * Math.min(1, dt * 3);
   } else {
-    camera.rotation.z += (bobRoll - camera.rotation.z) * Math.min(1, dt * 10);
+    const rollTarget = bobRoll - G.slideBlend * (0.055 - slideLean * 0.035);
+    camera.rotation.z += (rollTarget - camera.rotation.z) * Math.min(1, dt * 10);
   }
 
   const shakeX = (Math.random() - 0.5) * G.shake;
@@ -1489,20 +1614,21 @@ function updateLocalPlayer(dt, realDt = dt) {
   // FOV
   const sprintFov = (sprinting && speed > 1 && !G.dead) ? 2.5 : 0;
   G.fovKick *= Math.max(0, 1 - dt * 6);
-  const targetFov = 76 + sprintFov + (G.dead ? 8 : 0) + G.fovKick - G.focus * 2.6;
+  const targetFov = 76 + sprintFov + (G.dead ? 8 : 0) + G.fovKick - G.focus * 2.6
+    + G.slideBlend * 6.5 - G.crouchBlend * 1.5;
   camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
   camera.updateProjectionMatrix();
 
   // footprints + crunch
-  if (alive && G.grounded && speed > 0.8 && G.mode === 'playing') {
+  if (alive && G.grounded && speed > 0.8 && G.mode === 'playing' && !G.sliding) {
     G.footAccum += speed * dt;
-    const stepDist = sprinting ? 1.45 : 1.05;
+    const stepDist = G.crouchToggle ? 0.78 : (sprinting ? 1.45 : 1.05);
     if (G.footAccum >= stepDist) {
       G.footAccum = 0;
       G.footSide *= -1;
       effects.footstep(G.pos.x, G.pos.z, G.yaw + Math.PI, G.footSide);
       if (sprinting) effects.spray(G.pos.x, G.pos.z, -moveDir.x, -moveDir.z, 0.45);
-      audio.footstep(sprinting);
+      audio.footstep(sprinting && !G.crouchToggle);
     }
   } else if (G.footAccum > 0) {
     G.footAccum = Math.max(0, G.footAccum - dt);
@@ -1539,7 +1665,8 @@ function updateLocalPlayer(dt, realDt = dt) {
   }
   viewmodel.update(realDt, {
     speed, sprinting, charging: G.charge,
-    swayX, swayY, grounded: G.grounded, spread: vmScale
+    swayX, swayY, grounded: G.grounded, spread: vmScale,
+    crouch: G.crouchBlend, sliding: G.slideBlend
   });
   viewmodel.setVisible(!G.dead && G.mode !== 'menu');
   aim.update(realDt, G.charging ? G.charge : 0);
@@ -1574,12 +1701,15 @@ function updateRemotes(dt) {
     const yaw = a.yaw + dy * k;
     const pitch = a.pitch + (b.pitch - a.pitch) * k;
 
+    const animId = b.anim | 0;
     r.ch.root.position.set(x, y, z);
     r.ch.update(dt, {
       yaw,
       pitch,
-      moving: (b.anim | 0) > 0,
-      sprinting: (b.anim | 0) > 1,
+      moving: animId === 1 || animId === 2 || animId === 4,
+      sprinting: animId === 2,
+      crouching: animId === 3 || animId === 4,
+      sliding: animId === 5,
       dead: !!b.dead
     });
     if (r.tag) r.tag.visible = !b.dead;
@@ -1626,16 +1756,20 @@ function sendState() {
   const now = nowMs();
   if (now - G.lastInput < 50) return;
   G.lastInput = now;
-  const moving = Math.hypot(moveDir.x, moveDir.z) > 0.6;
-  const sprinting = G.keys.has('ShiftLeft') || G.keys.has('ShiftRight');
+  const speed = Math.hypot(moveDir.x, moveDir.z);
+  const moving = speed > 0.6;
+  let anim = 0;
+  if (G.sliding) anim = 5;
+  else if (G.crouchToggle) anim = moving ? 4 : 3;
+  else if (moving) anim = (G.sprintToggle && speed > PLAYER.walk * 1.02) ? 2 : 1;
   G.session.input({
     t: 's',
     p: [Number(G.pos.x.toFixed(2)), Number(G.pos.y.toFixed(2)), Number(G.pos.z.toFixed(2))],
     y: Number(G.yaw.toFixed(3)),
     pitch: Number(G.pitch.toFixed(3)),
-    a: moving ? (sprinting ? 2 : 1) : 0,
+    a: anim,
     m: moving ? 1 : 0,
-    sp: sprinting ? 1 : 0
+    sp: anim === 2 || anim === 5 ? 1 : 0
   });
 }
 
@@ -1859,6 +1993,8 @@ document.addEventListener('visibilitychange', () => {
     G.keys.clear();
     G.charging = false;
     G.charge = 0;
+    G.sprintToggle = false;
+    G.sliding = false;
     ui.chargeRing.classList.remove('active');
   }
 });

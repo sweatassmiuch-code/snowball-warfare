@@ -1116,6 +1116,8 @@ export function createCharacter(colorIdx, look) {
     deadProgress: 0,
     deadSide: Math.random() < 0.5 ? -1 : 1,
     moveBlend: 0,
+    crouchBlend: 0,
+    slideBlend: 0,
     yawPrev: 0,
     turnVel: 0,
     hitT: 0,
@@ -1140,28 +1142,35 @@ export function createCharacter(colorIdx, look) {
   // forward and a positive elbow rotation folds the forearm forward. The old
   // keys had both signs inverted, which is why the arm threw itself backwards.
   const THROW_KEYS = [
-    { t: 0.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000 },
-    { t: 0.20, ty: -0.38, tx: 0.06, rx: -2.35, rz: 0.28, re: 1.25, rw: -0.30, lx: 0.52, lz: -0.26, dip: -0.035 },
-    { t: 0.34, ty: 0.30, tx: -0.12, rx: 2.05, rz: 0.02, re: 0.18, rw: 0.40, lx: -0.30, lz: -0.14, dip: 0.012 },
-    { t: 0.58, ty: 0.22, tx: -0.16, rx: 1.32, rz: -0.12, re: 0.34, rw: 0.18, lx: -0.16, lz: -0.08, dip: 0.004 },
-    { t: 1.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000 }
+    { t: 0.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000, lf: 0.00, rf: 0.00, ease: 'smooth' },
+    // deep coil: shoulder opens away, weight settles onto the back foot
+    { t: 0.20, ty: -0.46, tx: 0.10, rx: -2.55, rz: 0.34, re: 1.45, rw: -0.42, lx: 0.62, lz: -0.30, dip: -0.045, lf: 0.30, rf: -0.22, ease: 'smooth' },
+    // release: hips fire through, the arm whips past the head
+    { t: 0.32, ty: 0.34, tx: -0.16, rx: 2.25, rz: 0.00, re: 0.14, rw: 0.46, lx: -0.34, lz: -0.12, dip: 0.016, lf: -0.16, rf: 0.34, ease: 'snap' },
+    // follow-through: the arm keeps travelling and folds across the chest
+    { t: 0.50, ty: 0.20, tx: -0.10, rx: 1.15, rz: -0.14, re: 0.55, rw: 0.20, lx: -0.14, lz: -0.06, dip: 0.000, lf: -0.10, rf: 0.22, ease: 'smooth' },
+    { t: 0.76, ty: 0.05, tx: -0.02, rx: 0.45, rz: 0.02, re: 0.40, rw: 0.06, lx: 0.02, lz: -0.08, dip: 0.000, lf: -0.03, rf: 0.06, ease: 'smooth' },
+    { t: 1.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000, lf: 0.00, rf: 0.00, ease: 'smooth' }
   ];
-  const throwPose = { ty: 0, tx: 0, rx: 0, rz: 0, re: 0, rw: 0, lx: 0, lz: 0, dip: 0 };
+  const throwPose = { ty: 0, tx: 0, rx: 0, rz: 0, re: 0, rw: 0, lx: 0, lz: 0, dip: 0, lf: 0, rf: 0 };
   function sampleThrow(t) {
     let a = THROW_KEYS[0], b = THROW_KEYS[1];
     for (let i = 0; i < THROW_KEYS.length - 1; i++) {
       if (t >= THROW_KEYS[i].t && t <= THROW_KEYS[i + 1].t) { a = THROW_KEYS[i]; b = THROW_KEYS[i + 1]; break; }
     }
     let k = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
-    k = k * k * (3 - 2 * k);
-    for (const key of ['ty', 'tx', 'rx', 'rz', 're', 'rw', 'lx', 'lz', 'dip']) {
+    // the release segment leaves in a straight line instead of easing out, so
+    // the arm snaps like a whip rather than drifting into the forward pose
+    k = b.ease === 'snap' ? 1 - Math.pow(1 - k, 3) : k * k * (3 - 2 * k);
+    for (const key of ['ty', 'tx', 'rx', 'rz', 're', 'rw', 'lx', 'lz', 'dip', 'lf', 'rf']) {
       throwPose[key] = a[key] + (b[key] - a[key]) * k;
     }
     return throwPose;
   }
 
   function update(dt, opts) {
-    const { yaw = 0, pitch = 0, moving = false, sprinting = false, dead = false } = opts || {};
+    const { yaw = 0, pitch = 0, moving = false, sprinting = false, crouching = false, sliding = false, dead = false } = opts || {};
+    const mix = (a, b, k) => a + (b - a) * k;
     state.time += dt;
 
     // occasional blink keeps the face alive instead of staring
@@ -1180,6 +1189,12 @@ export function createCharacter(colorIdx, look) {
     const target = dead ? 0 : (moving ? (sprinting ? 1 : 0.58) : 0);
     state.moveBlend += (target - state.moveBlend) * Math.min(1, dt * 8);
     const amp = state.moveBlend;
+
+    // stance blends drive the crouch and the slide from one weight each
+    const crouchTarget = (!dead && crouching && !sliding) ? 1 : 0;
+    const slideTarget = (!dead && sliding) ? 1 : 0;
+    state.crouchBlend += (crouchTarget - state.crouchBlend) * Math.min(1, dt * 12);
+    state.slideBlend += (slideTarget - state.slideBlend) * Math.min(1, dt * 9);
 
     // lean into turns
     let dYaw = yaw - state.yawPrev;
@@ -1273,11 +1288,70 @@ export function createCharacter(colorIdx, look) {
     headGroup.rotation.y = -sp * 0.06 * amp - lean * 0.10 + glance * 0.18 * idle;
     headGroup.rotation.z = sp * 0.03 * amp + lean * 0.05;
 
+    // --- crouch -----------------------------------------------------------
+    // The body folds down over bent knees instead of scaling: pelvis drops,
+    // chest tips forward, elbows tuck in and the head keeps looking ahead.
+    const cr = state.crouchBlend;
+    if (cr > 0.001) {
+      const sway = Math.sin(state.phase * 0.6) * 0.035 * (0.35 + amp);
+      hips.position.y = mix(hips.position.y, 0.58, cr);
+      hips.rotation.x = mix(hips.rotation.x, 0.16, cr);
+      hips.rotation.y = mix(hips.rotation.y, sway * 0.6, cr);
+      legL.hip.rotation.x = mix(legL.hip.rotation.x, 0.72 + sway, cr);
+      legR.hip.rotation.x = mix(legR.hip.rotation.x, 0.72 - sway, cr);
+      legL.knee.rotation.x = mix(legL.knee.rotation.x, -1.30, cr);
+      legR.knee.rotation.x = mix(legR.knee.rotation.x, -1.30, cr);
+      legL.foot.rotation.x = mix(legL.foot.rotation.x, 0.56, cr);
+      legR.foot.rotation.x = mix(legR.foot.rotation.x, 0.56, cr);
+      torsoGroup.rotation.x = mix(torsoGroup.rotation.x, -0.34 + sway * 0.5, cr);
+      torsoGroup.rotation.y *= 1 - cr * 0.75;
+      armL.shoulder.rotation.x = mix(armL.shoulder.rotation.x, 0.85, cr);
+      armR.shoulder.rotation.x = mix(armR.shoulder.rotation.x, 0.80, cr);
+      armL.shoulder.rotation.z = mix(armL.shoulder.rotation.z, -0.24, cr);
+      armR.shoulder.rotation.z = mix(armR.shoulder.rotation.z, 0.24, cr);
+      armL.elbow.rotation.x = mix(armL.elbow.rotation.x, 1.25, cr);
+      armR.elbow.rotation.x = mix(armR.elbow.rotation.x, 1.15, cr);
+      headGroup.rotation.x = mix(headGroup.rotation.x, 0.16, cr);
+    }
+
+    // --- slide ------------------------------------------------------------
+    // Lead leg thrown out front, trailing leg folded underneath, chest opened
+    // back and arms wide: a skid silhouette instead of a moving squat.
+    const sl = state.slideBlend;
+    if (sl > 0.001) {
+      const wobble = Math.sin(state.time * 8.5) * 0.025 * sl;
+      hips.position.y = mix(hips.position.y, 0.40, sl);
+      hips.rotation.x = mix(hips.rotation.x, -0.10, sl);
+      hips.rotation.y = mix(hips.rotation.y, 0.12, sl);
+      hips.rotation.z = mix(hips.rotation.z, -0.06 + wobble, sl);
+      legL.hip.rotation.x = mix(legL.hip.rotation.x, 1.32, sl);
+      legL.knee.rotation.x = mix(legL.knee.rotation.x, -0.16, sl);
+      legL.foot.rotation.x = mix(legL.foot.rotation.x, 0.42, sl);
+      legR.hip.rotation.x = mix(legR.hip.rotation.x, -0.30, sl);
+      legR.knee.rotation.x = mix(legR.knee.rotation.x, -1.70, sl);
+      legR.foot.rotation.x = mix(legR.foot.rotation.x, 0.60, sl);
+      torsoGroup.rotation.x = mix(torsoGroup.rotation.x, 0.30 + wobble, sl);
+      torsoGroup.rotation.y = mix(torsoGroup.rotation.y, -0.22, sl);
+      torsoGroup.rotation.z = mix(torsoGroup.rotation.z, 0.05, sl);
+      armL.shoulder.rotation.x = mix(armL.shoulder.rotation.x, 0.80, sl);
+      armR.shoulder.rotation.x = mix(armR.shoulder.rotation.x, 0.55, sl);
+      armL.shoulder.rotation.z = mix(armL.shoulder.rotation.z, -1.05, sl);
+      armR.shoulder.rotation.z = mix(armR.shoulder.rotation.z, 1.00, sl);
+      armL.elbow.rotation.x = mix(armL.elbow.rotation.x, 0.55, sl);
+      armR.elbow.rotation.x = mix(armR.elbow.rotation.x, 0.65, sl);
+      headGroup.rotation.x = mix(headGroup.rotation.x, 0.12, sl);
+      headGroup.rotation.z = mix(headGroup.rotation.z, 0.06, sl);
+    }
+
     // --- throw ------------------------------------------------------------
     let throwing = false;
     if (state.throwT > 0) {
-      state.throwT += dt / 0.60;
-      const p = sampleThrow(Math.min(1, state.throwT));
+      state.throwT += dt / 0.66;
+      const t = Math.min(1, state.throwT);
+      const p = sampleThrow(t);
+      // fade the stance in and out so a throw never snaps the legs
+      const w = Math.min(1, Math.min(t / 0.14, (1 - t) / 0.22));
+      const ww = w * w * (3 - 2 * w);
       throwing = true;
       torsoGroup.rotation.y = p.ty;
       torsoGroup.rotation.x = p.tx;
@@ -1288,8 +1362,14 @@ export function createCharacter(colorIdx, look) {
       armR.hand.rotation.x = p.rw;
       armL.shoulder.rotation.x = p.lx;
       armL.shoulder.rotation.z = p.lz;
+      armL.elbow.rotation.x = mix(armL.elbow.rotation.x, 0.38, ww);
       hips.position.y += p.dip;
       hips.rotation.y = p.ty * 0.4;
+      // back foot loads the coil, front foot catches the weight on release
+      legL.hip.rotation.x = mix(legL.hip.rotation.x, 0.10 + p.lf, ww);
+      legR.hip.rotation.x = mix(legR.hip.rotation.x, -0.06 + p.rf, ww);
+      legL.knee.rotation.x = mix(legL.knee.rotation.x, -0.20 - p.lf * 0.45, ww);
+      legR.knee.rotation.x = mix(legR.knee.rotation.x, -0.34 + p.rf * 0.35, ww);
       if (state.throwT >= 1) { state.throwT = 0; armR.hand.rotation.x = 0; }
     }
     if (!throwing) armR.hand.rotation.x *= Math.max(0, 1 - dt * 14);
@@ -1438,7 +1518,19 @@ export function createViewModel(look) {
 
   function throwBall() { throwT = 0.001; }
 
-  function update(dt, { speed = 0, sprinting = false, charging = 0, swayX = 0, swayY = 0, grounded = true, spread = 1 } = {}) {
+  // First-person release: the wind-up already happened while charging, so the
+  // throw itself is one whip forward that the ball leaves on, followed by a
+  // heavy arc back to neutral. Starting on the forward beat keeps the visible
+  // hand in sync with the snowball that actually leaves the game.
+  const VM_THROW_KEYS = [
+    { t: 0.00, x: 0.000, y: 0.000, z: 0.000, roll: 0.00, pitch: 0.00, wrist: 0.00, ease: 'smooth' },
+    { t: 0.16, x: 0.180, y: 0.240, z: -0.420, roll: -0.66, pitch: 0.62, wrist: 1.45, ease: 'snap' },
+    { t: 0.34, x: 0.110, y: 0.130, z: -0.240, roll: -0.42, pitch: 0.30, wrist: 0.62, ease: 'smooth' },
+    { t: 0.62, x: 0.030, y: 0.020, z: -0.060, roll: -0.08, pitch: 0.04, wrist: 0.10, ease: 'smooth' },
+    { t: 1.00, x: 0.000, y: 0.000, z: 0.000, roll: 0.00, pitch: 0.00, wrist: 0.00, ease: 'smooth' }
+  ];
+
+  function update(dt, { speed = 0, sprinting = false, charging = 0, swayX = 0, swayY = 0, grounded = true, spread = 1, crouch = 0, sliding = 0 } = {}) {
     chargeTarget = charging;
     charge += (chargeTarget - charge) * Math.min(1, dt * 12);
 
@@ -1448,27 +1540,25 @@ export function createViewModel(look) {
     const bobY = Math.abs(Math.cos(bobPhase)) * 0.021 * bobAmt;
     const bobZ = Math.sin(bobPhase * 2) * 0.012 * bobAmt;
 
-    throwT = throwT > 0 ? throwT + dt / 0.44 : 0;
+    throwT = throwT > 0 ? throwT + dt / 0.52 : 0;
     if (throwT > 1) throwT = 0;
 
-    // wind-up, snap, then let the arm keep travelling past neutral
-    let throwX = 0, throwY = 0, throwZ = 0, throwRoll = 0, throwPitch = 0;
-    const ease = (a, b, k) => a + (b - a) * Math.min(1, Math.max(0, k * k * (3 - 2 * k)));
+    // wind-up, whip, then let the arm keep travelling past neutral
+    let throwX = 0, throwY = 0, throwZ = 0, throwRoll = 0, throwPitch = 0, throwWrist = 0;
     if (throwT > 0) {
-      const t = throwT;
-      if (t < 0.22) {
-        const k = t / 0.22;
-        throwZ = ease(0, 0.10, k); throwY = ease(0, 0.05, k); throwPitch = ease(0, 0.38, k);
-      } else if (t < 0.45) {
-        const k = 1 - Math.pow(1 - (t - 0.22) / 0.23, 2.2);
-        throwZ = 0.10 - 0.44 * k; throwY = 0.05 + 0.27 * k;
-        throwX = 0.17 * k; throwRoll = -0.55 * k; throwPitch = 0.38 - 1.05 * k;
-      } else {
-        const k = (t - 0.45) / 0.55;
-        const e = k * k * (3 - 2 * k);
-        throwZ = -0.34 * (1 - e); throwY = 0.32 * (1 - e);
-        throwX = 0.17 * (1 - e); throwRoll = -0.55 * (1 - e); throwPitch = -0.67 * (1 - e);
+      let a = VM_THROW_KEYS[0], b = VM_THROW_KEYS[1];
+      for (let i = 0; i < VM_THROW_KEYS.length - 1; i++) {
+        if (throwT >= VM_THROW_KEYS[i].t && throwT <= VM_THROW_KEYS[i + 1].t) { a = VM_THROW_KEYS[i]; b = VM_THROW_KEYS[i + 1]; break; }
       }
+      const span = b.t - a.t;
+      let k = span > 0 ? (throwT - a.t) / span : 1;
+      k = b.ease === 'snap' ? 1 - Math.pow(1 - k, 3) : k * k * (3 - 2 * k);
+      throwX = a.x + (b.x - a.x) * k;
+      throwY = a.y + (b.y - a.y) * k;
+      throwZ = a.z + (b.z - a.z) * k;
+      throwRoll = a.roll + (b.roll - a.roll) * k;
+      throwPitch = a.pitch + (b.pitch - a.pitch) * k;
+      throwWrist = a.wrist + (b.wrist - a.wrist) * k;
     }
 
     const tremble = charge > 0.9 ? (Math.random() - 0.5) * 0.006 * (charge - 0.9) * 10 : 0;
@@ -1491,16 +1581,23 @@ export function createViewModel(look) {
       group.rotation.x += 0.028;
     }
 
+    // crouching and sliding pull the whole arm out of the sight line
+    group.position.y -= crouch * 0.17 + sliding * 0.07;
+    group.position.z += sliding * 0.04;
+    group.rotation.x += crouch * 0.10 - sliding * 0.15;
+
     // the mitten squeezes the snow while charging and opens as the ball leaves
-    const releaseOpen = throwT > 0.3 && throwT < 0.7 ? 1 : 0;
-    openAmount += ((releaseOpen ? 1 : 0) - openAmount) * Math.min(1, dt * 16);
+    const releaseOpen = throwT > 0.04 && throwT < 0.34 ? 1 : 0;
+    openAmount += ((releaseOpen ? 1 : 0) - openAmount) * Math.min(1, dt * 20);
     mitten.rotation.x = 0.22 + 0.10 * charge - 0.30 * openAmount;
     mitten.scale.setScalar(1 + charge * 0.03 - openAmount * 0.05);
+    hand.rotation.x = -0.20 + throwWrist * 0.60;
 
-    ball.visible = !(throwT > 0.26 && throwT < 0.82);
+    // the snowball leaves the hand on the very first frame of the throw
+    ball.visible = !(throwT > 0.01 && throwT < 0.42);
     const s = 0.85 + charge * 0.25;
     // squeeze the snow as the grip tightens, stretch it on release
-    const stretch = throwT > 0.26 && throwT < 0.5 ? (1 - (throwT - 0.26) / 0.24) * 0.10 : 0;
+    const stretch = throwT > 0.00 && throwT < 0.16 ? (1 - throwT / 0.16) * 0.10 : 0;
     ball.scale.set(s * (1 - charge * 0.04 - stretch * 0.3), s * (1 + charge * 0.06 + stretch), s * (1 - charge * 0.04));
     ball.position.z = 0.045 - charge * 0.012;
     ball.position.y = 0.105 - charge * 0.008;
@@ -1508,7 +1605,7 @@ export function createViewModel(look) {
 
     // arm pulls back and down as the throw charges; the pivot itself moves
     // towards the middle on narrow screens so the hand never leaves the frame
-    armPivot.rotation.set(charge * 0.10, 0, 0);
+    armPivot.rotation.set(charge * 0.10 + throwPitch * 0.45, 0, throwRoll * 0.22);
     armPivot.position.set(
       (0.38 - charge * 0.030 + swayX * 0.002) * spread * spread,
       -0.26 - charge * 0.032 + swayY * 0.002,

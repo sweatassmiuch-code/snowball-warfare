@@ -14,6 +14,7 @@ export const PLAYER = {
   eye: 1.62,
   walk: 5.0,
   sprint: 7.6,
+  crouch: 2.7,
   jump: 5.0,
   accel: 34,
   friction: 11
