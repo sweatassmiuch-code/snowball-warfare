@@ -30,9 +30,11 @@ const ui = {
   muteBtn: $('muteBtn'), menuBtn: $('menuBtn'), toast: $('toast'), copyCode: $('copyCode'),
   roomChip: $('roomChip'), staminaFill: $('staminaFill'), staminaWrap: $('staminaWrap'),
   perfChip: $('perfChip'), fpsVal: $('fpsVal'), fpsScale: $('fpsScale'),
-  preview: $('preview'), lookSummary: $('lookSummary'), randomLook: $('randomLook'),
-  fpsToggle: $('fpsToggle'), swJacket: $('swJacket'), swScarf: $('swScarf'),
-  swHat: $('swHat'), swSkin: $('swSkin'), optionsBtn: $('optionsBtn'),
+  preview: $('preview'), lookSummary: $('lookSummary'), lookDots: $('lookDots'),
+  customizeBtn: $('customizeBtn'), customize: $('customize'), customizeClose: $('customizeClose'),
+  custTabs: $('custTabs'), custGrid: $('custGrid'), custSlotLabel: $('custSlotLabel'),
+  custPick: $('custPick'), custRandom: $('custRandom'), custDone: $('custDone'),
+  fpsToggle: $('fpsToggle'), optionsBtn: $('optionsBtn'),
   optionsPanel: $('optionsPanel'), optionsClose: $('optionsClose')
 };
 
@@ -492,12 +494,15 @@ function setLoading(on, text = 'Verbinde …') {
 // ---------------------------------------------------------------------------
 // Palette swatches + live character preview
 // ---------------------------------------------------------------------------
-const LOOK_SLOTS = [
-  { key: 'j', box: ui.swJacket, list: LOOK_PALETTES.jacket },
-  { key: 's', box: ui.swScarf, list: LOOK_PALETTES.scarf },
-  { key: 'h', box: ui.swHat, list: LOOK_PALETTES.hat },
-  { key: 'k', box: ui.swSkin, list: LOOK_PALETTES.skin }
+const CUSTOM_SLOTS = [
+  { key: 'j', label: 'JACKE', list: LOOK_PALETTES.jacket, names: LOOK_PALETTES.names.jacket },
+  { key: 's', label: 'KRAGEN', list: LOOK_PALETTES.scarf, names: LOOK_PALETTES.names.scarf },
+  { key: 'h', label: 'MÜTZE', list: LOOK_PALETTES.hat, names: LOOK_PALETTES.names.hat },
+  { key: 'k', label: 'HAUT', list: LOOK_PALETTES.skin, names: LOOK_PALETTES.names.skin }
 ];
+let custSlotKey = 'j';
+const slotOf = (key) => CUSTOM_SLOTS.find((s) => s.key === key) || CUSTOM_SLOTS[0];
+const colorHex = (color) => '#' + new THREE.Color(color).getHexString();
 
 function lookSummary() {
   const j = LOOK_PALETTES.names.jacket[settings.look.j % LOOK_PALETTES.jacket.length] || 'Jacke';
@@ -506,35 +511,89 @@ function lookSummary() {
   return `${j} · ${s} · ${k}`;
 }
 
-function paintSwatches() {
-  for (const slot of LOOK_SLOTS) {
-    if (!slot.box) continue;
-    [...slot.box.children].forEach((b, i) => b.classList.toggle('is-on', settings.look[slot.key] === i));
+// The customizer window: tab per garment slot, one large swatch per colour.
+function paintCustGrid() {
+  const slot = slotOf(custSlotKey);
+  const idx = settings.look[slot.key] % slot.list.length;
+  if (ui.custSlotLabel) ui.custSlotLabel.textContent = slot.label;
+  if (ui.custPick) ui.custPick.textContent = slot.names[idx] || '–';
+  if (ui.custTabs) {
+    for (const tab of ui.custTabs.children) tab.classList.toggle('is-on', tab.dataset.slot === slot.key);
   }
-  if (ui.lookSummary) ui.lookSummary.textContent = lookSummary();
+  if (ui.custGrid) {
+    for (const sw of ui.custGrid.children) sw.classList.toggle('is-on', Number(sw.dataset.index) === idx);
+  }
 }
 
-function buildSwatches() {
-  for (const slot of LOOK_SLOTS) {
-    if (!slot.box) continue;
-    slot.box.innerHTML = '';
-    slot.list.forEach((color, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'swatch';
-      b.style.background = '#' + new THREE.Color(color).getHexString();
-      b.title = slot.key.toUpperCase() + ' ' + (i + 1);
-      b.addEventListener('click', () => {
-        if (settings.look[slot.key] === i) return;
-        settings.look[slot.key] = i;
-        saveSettings();
-        paintSwatches();
-        preview.refresh();
-      });
-      slot.box.appendChild(b);
+function renderCustGrid() {
+  if (!ui.custGrid) return;
+  const slot = slotOf(custSlotKey);
+  ui.custGrid.innerHTML = '';
+  slot.list.forEach((color, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'c7-cust-sw';
+    b.dataset.index = String(i);
+    b.style.setProperty('--sw', colorHex(color));
+    const chip = document.createElement('i');
+    const name = document.createElement('span');
+    name.textContent = slot.names[i] || String(i + 1);
+    b.append(chip, name);
+    b.addEventListener('click', () => {
+      if (settings.look[slot.key] === i) return;
+      settings.look[slot.key] = i;
+      saveSettings();
+      paintLook();
+      preview.refresh();
     });
+    ui.custGrid.appendChild(b);
+  });
+  paintCustGrid();
+}
+
+function paintLook() {
+  if (ui.lookSummary) ui.lookSummary.textContent = lookSummary();
+  if (ui.lookDots) {
+    ui.lookDots.innerHTML = '';
+    for (const slot of CUSTOM_SLOTS) {
+      const chip = document.createElement('i');
+      chip.style.background = colorHex(slot.list[settings.look[slot.key] % slot.list.length]);
+      ui.lookDots.appendChild(chip);
+    }
   }
-  paintSwatches();
+  paintCustGrid();
+}
+
+function buildCustomizer() {
+  if (!ui.custTabs) return;
+  ui.custTabs.innerHTML = '';
+  for (const slot of CUSTOM_SLOTS) {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'c7-cust-tab';
+    tab.dataset.slot = slot.key;
+    tab.setAttribute('role', 'tab');
+    tab.textContent = slot.label;
+    tab.addEventListener('click', () => {
+      custSlotKey = slot.key;
+      renderCustGrid();
+      paintCustGrid();
+    });
+    ui.custTabs.appendChild(tab);
+  }
+  renderCustGrid();
+}
+
+function setCustomizer(open) {
+  if (!ui.customize) return;
+  ui.customize.classList.toggle('hidden', !open);
+  ui.customizeBtn?.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  custSlotKey = custSlotKey || 'j';
+  renderCustGrid();
+  paintCustGrid();
+  const tab = [...ui.custTabs.children].find((t) => t.dataset.slot === custSlotKey);
+  tab?.focus({ preventScroll: true });
 }
 
 const preview = (() => {
@@ -641,7 +700,19 @@ const preview = (() => {
   };
 })();
 
-ui.randomLook?.addEventListener('click', () => {
+ui.customizeBtn?.addEventListener('click', () => setCustomizer(true));
+ui.customizeClose?.addEventListener('click', () => setCustomizer(false));
+ui.custDone?.addEventListener('click', () => setCustomizer(false));
+ui.customize?.addEventListener('click', (e) => {
+  if (e.target instanceof Element && e.target.hasAttribute('data-cust-close')) setCustomizer(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !ui.customize || ui.customize.classList.contains('hidden')) return;
+  e.stopPropagation();
+  setCustomizer(false);
+  ui.customizeBtn?.focus({ preventScroll: true });
+});
+ui.custRandom?.addEventListener('click', () => {
   const pick = (n) => Math.floor(Math.random() * n);
   settings.look = {
     j: pick(LOOK_PALETTES.jacket.length),
@@ -650,7 +721,7 @@ ui.randomLook?.addEventListener('click', () => {
     h: pick(LOOK_PALETTES.hat.length)
   };
   saveSettings();
-  paintSwatches();
+  paintLook();
   preview.refresh();
 });
 
@@ -663,7 +734,8 @@ ui.fpsToggle?.addEventListener('change', () => {
   ui.perfChip.classList.toggle('hidden', !settings.showFps);
 });
 
-buildSwatches();
+buildCustomizer();
+paintLook();
 preview.refresh();
 
 // The menu is toggled by class in several places, so follow the class instead

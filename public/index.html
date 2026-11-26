@@ -97,8 +97,8 @@
     </button>
     <div id="menuStatus" class="c7-status">Bereit.</div>
 
+    <div class="c7-or"><i></i><span>ODER MIT RAUMCODE</span><i></i></div>
     <div class="c7-join">
-      <span class="c7-label">RAUMCODE</span>
       <div class="c7-join-row">
         <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
         <button id="joinBtn">BEITRETEN</button>
@@ -108,19 +108,23 @@
     <div class="c7-locker">
       <div class="c7-locker-head">
         <b>DEIN LOOK</b>
+        <i class="c7-locker-line" aria-hidden="true"></i>
         <small id="lookSummary">Blau &middot; Weiss &middot; Hell</small>
-        <button id="randomLook">ZUFALL</button>
       </div>
-      <div class="c7-looks">
-        <div class="c7-look"><span>JACKE</span><div class="swatches" id="swJacket"></div></div>
-        <div class="c7-look"><span>KRAGEN</span><div class="swatches" id="swScarf"></div></div>
-        <div class="c7-look"><span>M&Uuml;TZE</span><div class="swatches" id="swHat"></div></div>
-        <div class="c7-look"><span>HAUT</span><div class="swatches" id="swSkin"></div></div>
-      </div>
+      <button class="c7-lookcard" id="customizeBtn" aria-haspopup="dialog" aria-controls="customize">
+        <span class="c7-lookcard-dots" id="lookDots" aria-hidden="true"></span>
+        <span class="c7-lookcard-text">
+          <b>ANPASSEN</b>
+          <small>JACKE &middot; KRAGEN &middot; M&Uuml;TZE &middot; HAUT</small>
+        </span>
+        <i class="c7-lookcard-arrow" aria-hidden="true">&#8594;</i>
+      </button>
     </div>
   </main>
 
   <section class="c7-stage" aria-label="Charakter-Vorschau">
+    <div class="c7-stage-num" aria-hidden="true">01</div>
+    <div class="c7-stage-rail" aria-hidden="true">SNOWBALL WARFARE &middot; SEASON 01</div>
     <div class="c7-stage-glow"></div>
     <div class="c7-stage-floor"></div>
     <canvas id="preview"></canvas>
@@ -187,6 +191,30 @@
       <div><kbd>M</kbd><span>Ton</span></div>
     </div>
   </section>
+
+  <div id="customize" class="c7-customize hidden" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
+    <div class="c7-customize-scrim" data-cust-close aria-hidden="true"></div>
+    <section class="c7-customize-card">
+      <header class="c7-cust-head">
+        <div>
+          <small>DEIN RIDER</small>
+          <h2 id="customizeTitle">ANPASSEN</h2>
+        </div>
+        <button class="c7-gear" id="customizeClose" aria-label="Schliessen">&times;</button>
+      </header>
+      <div class="c7-cust-tabs" id="custTabs" role="tablist" aria-label="Look-Kategorie"></div>
+      <div class="c7-cust-meta">
+        <span id="custSlotLabel">JACKE</span>
+        <b id="custPick">Blau</b>
+      </div>
+      <div class="c7-cust-grid" id="custGrid"></div>
+      <footer class="c7-cust-foot">
+        <button class="c7-cust-ghost" id="custRandom">ZUFALL</button>
+        <button class="c7-cust-done" id="custDone">FERTIG</button>
+      </footer>
+      <p class="c7-cust-note">LIVE-VORSCHAU <span aria-hidden="true">&#8594;</span></p>
+    </section>
+  </div>
 
   <div id="loading" class="loading hidden">
     <div class="spinner"></div>

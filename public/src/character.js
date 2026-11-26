@@ -146,6 +146,12 @@ const denimH = (x, y) => {
   const slub = (fbm2(x * 0.09, y * 0.09, 2) - 0.5) * 26;
   return 128 + twill + slub;
 };
+// Loose snow: crumbs and grain, used by the viewmodel snowball
+const snowH = (x, y) => {
+  const crumb = fbm2(x * 0.55, y * 0.55, 3) * 74;
+  const grain = (hash2(x * 2.3, y * 2.3) - 0.5) * 20;
+  return 96 + crumb + grain;
+};
 const skinH = (x, y) => {
   const pores = fbm2(x * 0.5, y * 0.5, 3) * 46;
   const fine = (hash2(x * 2, y * 2) - 0.5) * 14;
@@ -165,6 +171,7 @@ const knitBump = () => bumpTexture('knit', 256, knitH);
 const leatherBump = () => bumpTexture('leather', 256, leatherH);
 const denimBump = () => bumpTexture('denim', 256, denimH);
 const skinBump = () => bumpTexture('skin', 128, skinH);
+const snowNormal = () => normalTexture('snow', 128, snowH, 1.1);
 
 // ---------------------------------------------------------------------------
 // Head
@@ -763,6 +770,13 @@ function materialsFor(idx, look) {
       normalMap: fabricNormal(), normalScale: new THREE.Vector2(0.38, 0.38),
       sheen: 0.24, sheenRoughness: 0.9, envMapIntensity: 0.42
     }),
+    // panel and sleeve seams: darker than the shell so the cut lines read at
+    // menu distance without turning into black stripes
+    seam: new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(jacketColor).multiplyScalar(0.74), roughness: 0.92, metalness: 0,
+      normalMap: fabricNormal(), normalScale: new THREE.Vector2(0.5, 0.5),
+      sheen: 0.2, sheenRoughness: 0.9, envMapIntensity: 0.34
+    }),
     pants: new THREE.MeshStandardMaterial({
       color: 0x33394b, roughness: 0.9, metalness: 0,
       normalMap: denimNormal(), normalScale: new THREE.Vector2(0.18, 0.18), envMapIntensity: 0.35
@@ -1026,6 +1040,42 @@ function limbGeometry(baseX, baseY, baseZ, upperLen, lowerLen, radiusAt, opts = 
   return geo;
 }
 
+// A tube that follows a curve and can change radius along it: the viewmodel
+// fingers taper and swell at the joints instead of reading as equal sausages.
+function taperedTube(curve, radiusAt, segs = 16, radial = 10) {
+  const frames = curve.computeFrenetFrames(segs, false);
+  const pos = [], uvs = [], idx = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const p = curve.getPoint(t);
+    const r = radiusAt(t);
+    const N = frames.normals[i], B = frames.binormals[i];
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      const cx = Math.cos(a), sy = Math.sin(a);
+      pos.push(
+        p.x + (N.x * cx + B.x * sy) * r,
+        p.y + (N.y * cx + B.y * sy) * r,
+        p.z + (N.z * cx + B.z * sy) * r
+      );
+      uvs.push(j / radial, t);
+    }
+  }
+  for (let i = 0; i < segs; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * (radial + 1) + j, b = a + radial + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
 const armRadius = (t) => {
   if (t < 0.05) return 0.030 + t / 0.05 * 0.042;   // cap tucked inside the body
   if (t < 0.20) return 0.072 - (t - 0.05) * 0.02;
@@ -1063,12 +1113,15 @@ export function createCharacter(colorIdx, look) {
   torsoGroup.position.y = 0.02;
   hips.add(torsoGroup);
 
+  // Broad boxer build: the shell now carries real shoulder width, a barrel
+  // chest and a hem wide enough to cover the thighs, so head and body no
+  // longer sit in the same silhouette.
   const jacketSections = [
-    [-0.125, 0.181, 0.148], [-0.100, 0.180, 0.147], [-0.070, 0.176, 0.142],
-    [-0.030, 0.171, 0.137], [0.050, 0.168, 0.135], [0.130, 0.170, 0.138], [0.210, 0.177, 0.142],
-    [0.285, 0.185, 0.147], [0.350, 0.191, 0.151], [0.405, 0.194, 0.153],
-    [0.448, 0.191, 0.150], [0.478, 0.181, 0.145], [0.505, 0.163, 0.136],
-    [0.530, 0.138, 0.124], [0.552, 0.112, 0.112], [0.570, 0.094, 0.104]
+    [-0.125, 0.208, 0.160], [-0.100, 0.206, 0.158], [-0.070, 0.201, 0.154],
+    [-0.030, 0.195, 0.150], [0.050, 0.191, 0.147], [0.130, 0.196, 0.151], [0.210, 0.204, 0.156],
+    [0.285, 0.213, 0.161], [0.350, 0.222, 0.166], [0.405, 0.229, 0.169],
+    [0.448, 0.226, 0.167], [0.478, 0.214, 0.160], [0.505, 0.191, 0.150],
+    [0.530, 0.160, 0.135], [0.552, 0.126, 0.118], [0.570, 0.106, 0.107]
   ];
   // sample the base silhouette, then add a soft horizontal quilt: the shell
   // now reads as a down jacket instead of a painted blue box
@@ -1108,19 +1161,34 @@ export function createCharacter(colorIdx, look) {
       const bulge = i === 1 || i === 2 ? 0.0008 : 0;
       band.push([yy, base[0] + q + bulge, base[1] + q + bulge]);
     }
-    add(torsoGroup, loftGeometry(band, 32), m.jacketDark, [0, 0, 0]);
+    add(torsoGroup, loftGeometry(band, 32), m.seam, [0, 0, 0]);
+  }
+  // front panel seams: raised pipes down the chest, so the jacket reads as
+  // sewn panels instead of one painted surface
+  for (const side of [-1, 1]) {
+    const pts = [];
+    for (let i = 0; i <= 18; i++) {
+      const y = -0.112 + (0.398 + 0.112) * (i / 18);
+      const [rx, rz] = jacketAt(y);
+      const q = quiltAt(y);
+      const front = Math.sqrt(1 - 0.62 * 0.62);
+      pts.push(new THREE.Vector3(side * rx * 0.62, y, -(rz + q) * front - 0.0016));
+    }
+    add(torsoGroup, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 44, 0.0036, 6, false),
+      m.seam, [0, 0, 0]);
   }
 
   // ribbed hem: a darker band ends the jacket, so the torso does not read as
   // one endless blue box
   add(torsoGroup, loftGeometry([
-    [-0.128, 0.184, 0.151], [-0.112, 0.185, 0.152], [-0.094, 0.181, 0.147]
+    [-0.128, 0.211, 0.163], [-0.112, 0.212, 0.164], [-0.094, 0.207, 0.159]
   ], 30), m.jacketDark);
 
-  // deltoid caps: they close the armpit gap between the shell and the sleeve
+  // deltoid caps: they close the armpit gap between the shell and the sleeve,
+  // and sit wide enough to read as a real shoulder line
   for (const side of [-1, 1]) {
-    add(torsoGroup, new THREE.SphereGeometry(0.072, 20, 16), m.jacket,
-      [side * 0.154, 0.446, 0], null, [1.0, 0.9, 0.95]);
+    add(torsoGroup, new THREE.SphereGeometry(0.079, 20, 16), m.jacket,
+      [side * 0.204, 0.444, 0], null, [1.02, 0.92, 0.98]);
   }
 
   // bunched hood behind the neck: gives the collar a reason to exist
@@ -1219,8 +1287,8 @@ export function createCharacter(colorIdx, look) {
   // the top sections of the shell, so it wraps the neck like real trim instead
   // of floating as a torus. The head hides the middle; the sides stay white.
   const collarSections = [
-    [0.508, 0.160, 0.134], [0.524, 0.153, 0.130], [0.540, 0.144, 0.124],
-    [0.552, 0.132, 0.117], [0.562, 0.118, 0.110], [0.572, 0.104, 0.104]
+    [0.508, 0.190, 0.149], [0.524, 0.180, 0.143], [0.540, 0.168, 0.135],
+    [0.552, 0.152, 0.126], [0.562, 0.132, 0.116], [0.572, 0.112, 0.107]
   ];
   const collar = add(torsoGroup, loftGeometry(collarSections, 30), m.scarf, [0, 0, 0]);
   collar.castShadow = true;
@@ -1232,20 +1300,22 @@ export function createCharacter(colorIdx, look) {
   // bends like cloth.
   const armProfile = (t) => {
     let r;
-    if (t < 0.05) r = 0.030 + (t / 0.05) * 0.042;        // cap tucked in the body
-    else if (t < 0.18) r = 0.0720 - (t - 0.05) * 0.060;  // deltoid
-    else if (t < 0.44) r = 0.0642 - (t - 0.18) * 0.030;  // upper sleeve
-    else if (t < 0.56) r = 0.0564 - (t - 0.44) * 0.008;  // elbow
-    else if (t < 0.88) r = 0.0554 + (t - 0.56) * 0.004;  // forearm
-    else r = 0.0567 - ((t - 0.88) / 0.12) * 0.012;       // wrist
+    if (t < 0.05) r = 0.032 + (t / 0.05) * 0.046;        // cap tucked in the body
+    else if (t < 0.18) r = 0.0780 - (t - 0.05) * 0.0646;  // deltoid
+    else if (t < 0.44) r = 0.0696 - (t - 0.18) * 0.032;  // upper sleeve
+    else if (t < 0.56) r = 0.0613 - (t - 0.44) * 0.008;  // elbow
+    else if (t < 0.88) r = 0.0603 + (t - 0.56) * 0.004;  // forearm
+    else r = 0.0616 - ((t - 0.88) / 0.12) * 0.012;       // wrist
     // quilted sleeve: soft horizontal ribs from the deltoid to the cuff
     const quilt = t > 0.14 ? 0.0022 * Math.cos((t - 0.16) * 26) * Math.min(1, (t - 0.14) / 0.10) : 0;
     return r + quilt;
   };
   function makeArm(side) {
     const shoulder = new THREE.Bone();
-    shoulder.position.set(side * 0.162, 0.455, 0);
-    shoulder.rotation.z = side * 0.17;
+    // The pivot sits at the outer edge of the shell, so the sleeve hangs
+    // beside the jacket instead of being swallowed by it.
+    shoulder.position.set(side * 0.204, 0.455, 0);
+    shoulder.rotation.z = side * 0.12;
     torsoGroup.add(shoulder);
 
     const elbow = new THREE.Bone();
@@ -1259,8 +1329,17 @@ export function createCharacter(colorIdx, look) {
     root.updateMatrixWorld(true);
     arm.bind(new THREE.Skeleton([shoulder, elbow]), arm.matrixWorld.clone());
 
+    // two dark sleeve seams round the upper arm: with the white cuff they give
+    // the arm a shoulder line, a mid seam and a wrist instead of one tube
+    for (const [yy, rr] of [[-0.105, 0.0725], [-0.205, 0.0648]]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.0042, 6, 24), m.seam);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = yy;
+      shoulder.add(ring);
+    }
+
     // white knit cuff at the wrist, then one soft mitten (palm + thumb)
-    add(elbow, new THREE.CylinderGeometry(0.052, 0.055, 0.044, 18), m.scarf, [0, -0.266, 0]);
+    add(elbow, new THREE.CylinderGeometry(0.056, 0.059, 0.044, 18), m.scarf, [0, -0.266, 0]);
     const hand = new THREE.Group();
     hand.position.y = -0.290;
     elbow.add(hand);
@@ -1301,16 +1380,16 @@ export function createCharacter(colorIdx, look) {
   // one trouser leg over a hip and a knee bone: the knee folds smoothly instead
   // of showing the seam between two separate tubes
   const legProfile = (t) => {
-    if (t < 0.10) return 0.078 + t * 0.120;
-    if (t < 0.42) return 0.0900 - (t - 0.10) * 0.040;
-    if (t < 0.58) return 0.0772 - (t - 0.42) * 0.020;
-    if (t < 0.88) return 0.0740 - (t - 0.58) * 0.028;
-    return 0.0656 - (t - 0.88) * 0.070;
+    if (t < 0.10) return 0.083 + t * 0.125;
+    if (t < 0.42) return 0.0955 - (t - 0.10) * 0.042;
+    if (t < 0.58) return 0.0821 - (t - 0.42) * 0.020;
+    if (t < 0.88) return 0.0789 - (t - 0.58) * 0.028;
+    return 0.0705 - (t - 0.88) * 0.075;
   };
 
   function makeLeg(side) {
     const hip = new THREE.Bone();
-    hip.position.set(side * 0.098, -0.015, 0);
+    hip.position.set(side * 0.112, -0.015, 0);
     hips.add(hip);
     const knee = new THREE.Bone();
     knee.position.y = -0.375;
@@ -1395,11 +1474,11 @@ export function createCharacter(colorIdx, look) {
   // forward and a positive elbow rotation folds the forearm forward. The old
   // keys had both signs inverted, which is why the arm threw itself backwards.
   const THROW_KEYS = [
-    { t: 0.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000 },
+    { t: 0.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.12, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.12, dip: 0.000 },
     { t: 0.20, ty: -0.38, tx: 0.06, rx: -2.35, rz: 0.28, re: 1.25, rw: -0.30, lx: 0.52, lz: -0.26, dip: -0.035 },
     { t: 0.34, ty: 0.30, tx: -0.12, rx: 2.05, rz: 0.02, re: 0.18, rw: 0.40, lx: -0.30, lz: -0.14, dip: 0.012 },
     { t: 0.58, ty: 0.22, tx: -0.16, rx: 1.32, rz: -0.12, re: 0.34, rw: 0.18, lx: -0.16, lz: -0.08, dip: 0.004 },
-    { t: 1.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.08, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.08, dip: 0.000 }
+    { t: 1.00, ty: 0.00, tx: 0.00, rx: 0.05, rz: 0.12, re: 0.22, rw: 0.00, lx: 0.05, lz: -0.12, dip: 0.000 }
   ];
   const throwPose = { ty: 0, tx: 0, rx: 0, rz: 0, re: 0, rw: 0, lx: 0, lz: 0, dip: 0 };
   function sampleThrow(t) {
@@ -1507,22 +1586,31 @@ export function createCharacter(colorIdx, look) {
     // arms swing opposite the legs; elbows fold forwards as they come forward
     armL.shoulder.rotation.x = 0.05 - sp * (0.50 + 0.60 * amp) * amp;
     armR.shoulder.rotation.x = 0.05 + sp * (0.50 + 0.60 * amp) * amp;
-    armL.shoulder.rotation.z = -0.07 - 0.05 * amp;
-    armR.shoulder.rotation.z = 0.07 + 0.05 * amp;
+    armL.shoulder.rotation.z = -0.12 - 0.05 * amp;
+    armR.shoulder.rotation.z = 0.12 + 0.05 * amp;
     armL.elbow.rotation.x = 0.22 + Math.max(0, -sp) * 0.55 * amp;
     armR.elbow.rotation.x = 0.22 + Math.max(0, sp) * 0.55 * amp;
 
-    // idle: breathing, a slow weight shift and an occasional glance
+    // idle: a live stance instead of a mannequin — the chest fills and drops,
+    // the weight shifts from foot to foot and the arms settle out of phase
     const idle = 1 - Math.min(1, amp / 0.15);
+    const sway = Math.sin(state.time * 0.52);
+    const breathe = Math.sin(state.time * 1.55);
+    hips.position.x = sway * 0.006 * idle;
     if (idle > 0.001) {
-      const breathe = Math.sin(state.time * 1.7) * idle;
-      torsoGroup.position.y += breathe * 0.004;
-      torsoGroup.rotation.z += Math.sin(state.time * 0.7) * 0.014 * idle;
-      hips.position.y += breathe * 0.002;
-      armL.shoulder.rotation.x += -breathe * 0.03;
-      armR.shoulder.rotation.x += -breathe * 0.03;
-      armL.shoulder.rotation.z += breathe * 0.02;
-      armR.shoulder.rotation.z -= breathe * 0.02;
+      const settle = Math.sin(state.time * 0.52 + 1.1);
+      torsoGroup.position.y += breathe * 0.006 * idle;
+      torsoGroup.rotation.x += (-0.012 - breathe * 0.008) * idle;
+      torsoGroup.rotation.z += sway * 0.024 * idle;
+      hips.position.y += breathe * 0.003 * idle;
+      hips.rotation.z += sway * 0.014 * idle;
+      hips.rotation.y += sway * 0.020 * idle;
+      armL.shoulder.rotation.x += (-breathe * 0.05 + settle * 0.02) * idle;
+      armR.shoulder.rotation.x += (-breathe * 0.05 - settle * 0.02) * idle;
+      armL.shoulder.rotation.z += (-0.01 - breathe * 0.02) * idle;
+      armR.shoulder.rotation.z += (0.01 + breathe * 0.02) * idle;
+      armL.elbow.rotation.x += (0.06 + breathe * 0.035) * idle;
+      armR.elbow.rotation.x += (0.08 + breathe * 0.04) * idle;
     }
     const glance = Math.sin(state.time * 0.31) * Math.sin(state.time * 0.17 + 1.3);
     headGroup.rotation.y = -sp * 0.06 * amp - lean * 0.10 + glance * 0.18 * idle;
@@ -1629,9 +1717,16 @@ export function createViewModel(look) {
   const m = materialsFor(0, look);
   const sleeve = m.jacket;
   const trim = m.scarf;
-  const glove = m.mitten;
+  // the first-person glove gets its own, slightly lighter material: a black
+  // shape against snow and sky has no readable form at all
+  const glove = m.mitten.clone();
+  glove.color = new THREE.Color(0x4b5264);
+  glove.roughness = 0.72;
+  glove.sheen = 0.45;
+  glove.sheenColor = new THREE.Color(0xa8b2c6);
   const snowMat = new THREE.MeshStandardMaterial({
-    color: 0xf8fbff, roughness: 0.6, metalness: 0, envMapIntensity: 0.9
+    color: 0xe9f1fb, roughness: 0.95, metalness: 0, envMapIntensity: 0.35,
+    normalMap: snowNormal(), normalScale: new THREE.Vector2(0.9, 0.9)
   });
 
   const group = new THREE.Group();
@@ -1654,37 +1749,75 @@ export function createViewModel(look) {
   // white knit cuff, slightly flared at the top
   const cuff = add(armPivot, new THREE.CylinderGeometry(0.070, 0.064, 0.090, 22), trim, [0, 0.030, 0]);
   cuff.castShadow = false;
+  // rounded knit lip where the cuff meets the glove, instead of a hard cut
+  add(armPivot, new THREE.TorusGeometry(0.064, 0.0055, 8, 26), trim, [0, 0.075, 0], [Math.PI / 2, 0, 0]);
 
-  // mitten: one loft from the wrist to the knuckles
-  const mitten = add(armPivot, loftGeometry([
-    [0.058, 0.050, 0.046], [0.088, 0.059, 0.053], [0.122, 0.068, 0.058],
-    [0.158, 0.074, 0.061], [0.192, 0.073, 0.059], [0.216, 0.066, 0.052],
-    [0.234, 0.051, 0.041], [0.242, 0.026, 0.023]
-  ], 22), glove, [0, 0, 0]);
+  // mitten: one moulded glove. The palm swells at the knuckles and the finger
+  // side curls forward as it rises, so it cradles the ball from below instead
+  // of wearing it like a hat. Four finger sausages on top read as a claw; one
+  // clean mitten mass plus a thumb reads as a hand.
+  const mitten = add(armPivot, ringLoft([
+    [0.046, 0.000, 0.050, 0.046], [0.072, -0.002, 0.062, 0.055],
+    [0.102, -0.006, 0.074, 0.063], [0.132, -0.010, 0.082, 0.067],
+    [0.162, -0.014, 0.085, 0.068], [0.190, -0.020, 0.082, 0.065],
+    [0.212, -0.026, 0.074, 0.058], [0.226, -0.030, 0.060, 0.046],
+    [0.234, -0.034, 0.040, 0.030], [0.238, -0.036, 0.018, 0.014]
+  ], 26), glove, [0, 0, 0]);
   mitten.castShadow = false;
 
-  // thumb, rooted inside the mitten and angled up the ball's near side
-  const thumb = add(armPivot, new THREE.CapsuleGeometry(0.023, 0.052, 5, 12), glove,
-    [-0.054, 0.166, 0.010], [0.10, 0, 1.12]);
+  // fingers: one mitten band curled across the ball's lower front, with three
+  // soft knuckle waves in it and rounded ends. Separate tubes read as teeth
+  // from this angle; a band with a shaped radius reads as a closed hand.
+  const fingerCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.064, 0.286, -0.012),
+    new THREE.Vector3(0.048, 0.276, 0.026),
+    new THREE.Vector3(0.014, 0.272, 0.044),
+    new THREE.Vector3(-0.026, 0.277, 0.038),
+    new THREE.Vector3(-0.054, 0.287, 0.012)
+  ]);
+  const fingers = add(armPivot,
+    taperedTube(fingerCurve, (t) => 0.0212 - 0.0020 * Math.cos(t * Math.PI * 6), 26, 12),
+    glove, [0, 0, 0]);
+  fingers.castShadow = false;
+  for (const t of [0, 1]) {
+    const p = fingerCurve.getPoint(t);
+    add(armPivot, new THREE.SphereGeometry(0.0192, 14, 10), glove, [p.x, p.y, p.z]);
+  }
+
+  // thumb: rises from the palm's near side and closes the grip at the fingers
+  const thumbCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.060, 0.196, 0.018),
+    new THREE.Vector3(-0.082, 0.226, 0.040),
+    new THREE.Vector3(-0.078, 0.262, 0.044),
+    new THREE.Vector3(-0.056, 0.286, 0.020)
+  ]);
+  const thumb = add(armPivot, new THREE.TubeGeometry(thumbCurve, 20, 0.0205, 12, false), glove, [0, 0, 0]);
   thumb.castShadow = false;
+  for (const p of [thumbCurve.points[0], thumbCurve.points[3]]) {
+    add(armPivot, new THREE.SphereGeometry(0.0205, 14, 10), glove, [p.x, p.y, p.z]);
+  }
 
-  // snowball nested in the palm
+  // snowball: a lumpy packed lump of snow sitting in the curl of the mitten,
+  // not a white billiard ball with croutons stuck to it
   const ball = new THREE.Group();
-  ball.position.set(0.004, 0.276, -0.004);
+  ball.position.set(0, 0.316, -0.026);
   armPivot.add(ball);
-  const core = add(ball, new THREE.IcosahedronGeometry(0.070, 2), snowMat, [0, 0, 0]);
+  const snowGeo = new THREE.IcosahedronGeometry(0.084, 4);
+  {
+    const pos = snowGeo.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+      const n = fbm2(v.x * 18 + 17, v.y * 18 + 5, 3) * 0.65
+        + fbm2(v.z * 40 + 9, v.y * 38 + 23, 2) * 0.35;
+      v.multiplyScalar(1 + (n - 0.5) * 0.20);
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    snowGeo.computeVertexNormals();
+    snowGeo.computeBoundingSphere();
+  }
+  const core = add(ball, snowGeo, snowMat, [0, 0, 0]);
   core.castShadow = false;
-  for (let i = 0; i < 7; i++) {
-    const a = Math.random() * Math.PI * 2, r = 0.040 + Math.random() * 0.030;
-    add(ball, new THREE.SphereGeometry(0.014 + Math.random() * 0.013, 7, 6), snowMat,
-      [Math.cos(a) * r, (Math.random() - 0.5) * 0.070, Math.sin(a) * r]);
-  }
-
-  // three fingers curling out of the mitten over the ball's lower front
-  for (let i = 0; i < 3; i++) {
-    add(armPivot, new THREE.CapsuleGeometry(0.019, 0.050, 4, 10), glove,
-      [(i - 1) * 0.040, 0.216, 0.044], [0.85, 0, 0]);
-  }
   ball.visible = false;
 
   let throwT = 0;
@@ -1752,8 +1885,8 @@ export function createViewModel(look) {
     // squeeze the snow as the grip tightens, stretch it on release
     const stretch = throwT > 0.26 && throwT < 0.5 ? (1 - (throwT - 0.26) / 0.24) * 0.10 : 0;
     ball.scale.set(s * (1 - charge * 0.04 - stretch * 0.3), s * (1 + charge * 0.06 + stretch), s * (1 - charge * 0.04));
-    ball.position.z = -0.004 - charge * 0.010;
-    ball.position.y = 0.276 - charge * 0.008;
+    ball.position.z = -0.026 - charge * 0.010;
+    ball.position.y = 0.316 - charge * 0.008;
     ball.rotation.set(charge * 2.6, charge * 1.7, 0);
 
     // the arm coils in as the throw charges; the pivot moves towards the middle
