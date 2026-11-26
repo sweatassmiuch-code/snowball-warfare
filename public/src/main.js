@@ -14,8 +14,34 @@ import { hostGame, joinGame } from './net.js';
 // ---------------------------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
-const DEBUG = new URLSearchParams(location.search).has('debug');
+const params = new URLSearchParams(location.search);
+const DEBUG = params.has('debug');
+const coarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
+const hoverPointer = window.matchMedia ? window.matchMedia('(hover: hover)').matches : true;
+const isTouch = params.has('touch') || coarsePointer ||
+  ((navigator.maxTouchPoints || 0) > 0 && !hoverPointer);
+if (isTouch) document.body.classList.add('is-touch');
 const hasMouse = () => document.pointerLockElement === canvas || (DEBUG && !!window.__sbw?.forceInput);
+
+function syncOrientation() {
+  document.body.classList.toggle('portrait', isTouch && window.innerHeight > window.innerWidth);
+}
+syncOrientation();
+window.addEventListener('resize', syncOrientation);
+window.addEventListener('orientationchange', () => setTimeout(syncOrientation, 140));
+document.addEventListener('fullscreenchange', syncOrientation);
+
+async function goImmersive() {
+  try {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    }
+  } catch {}
+  try {
+    if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
+  } catch {}
+  syncOrientation();
+}
 const ui = {
   hud: $('hud'), menu: $('menu'), loading: $('loading'), loadingText: $('loadingText'),
   nameInput: $('nameInput'), hostBtn: $('hostBtn'), joinBtn: $('joinBtn'), joinCode: $('joinCode'),
@@ -35,7 +61,13 @@ const ui = {
   custTabs: $('custTabs'), custGrid: $('custGrid'), custSlotLabel: $('custSlotLabel'),
   custPick: $('custPick'), custRandom: $('custRandom'), custDone: $('custDone'),
   fpsToggle: $('fpsToggle'), optionsBtn: $('optionsBtn'),
-  optionsPanel: $('optionsPanel'), optionsClose: $('optionsClose')
+  optionsPanel: $('optionsPanel'), optionsClose: $('optionsClose'),
+  eventPlay: $('eventPlay'), joinToggle: $('joinToggle'), joinPanel: $('joinPanel'),
+  infoPanel: $('infoPanel'), infoClose: $('infoClose'), fullscreenBtn: $('fullscreenBtn'),
+  stick: $('stick'), stickKnob: $('stickKnob'),
+  touchSprint: $('touchSprint'), touchDuck: $('touchDuck'), touchJump: $('touchJump'),
+  touchThrow: $('touchThrow'), touchScore: $('touchScore'),
+  rotateGo: $('rotateGo')
 };
 
 // ---------------------------------------------------------------------------
@@ -82,7 +114,7 @@ try {
   throw e;
 }
 
-const dprCap = () => Math.min(window.devicePixelRatio || 1, 2);
+const dprCap = () => Math.min(window.devicePixelRatio || 1, isTouch ? 1.6 : 2);
 let dpr = dprCap();
 renderer.setPixelRatio(dpr);
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -350,6 +382,8 @@ const G = {
   toastTimer: 0,
   mouseSwayX: 0,
   mouseSwayY: 0,
+  touchX: 0,
+  touchY: 0,
   lastFrame: performance.now(),
   ping: 0,
   lastPingUpdate: 0,
@@ -612,8 +646,8 @@ const preview = (() => {
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(31, 1, 0.05, 20);
-    camera.position.set(0, 1.02, 5.0);
-    camera.lookAt(0, 0.96, 0);
+    camera.position.set(0, 1.0, 4.3);
+    camera.lookAt(0, 0.94, 0);
 
     scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a3742, 1.9));
     const key = new THREE.DirectionalLight(0xfff3e4, 2.5);
@@ -650,6 +684,7 @@ const preview = (() => {
     if (ch) scene.remove(ch.root);
     ch = createCharacter(characterColor(settings.name || 'du'), settings.look);
     ch.root.position.set(0, 0, 0);
+    ch.setHeldBall?.(true);
     scene.add(ch.root);
     pose(0);
   }
@@ -659,6 +694,10 @@ const preview = (() => {
     // the character owns its root yaw, so the turn goes through update() --
     // that keeps the idle lean and turn smoothing in one place
     ch.update(dt, { speed: 0, grounded: true, yaw: Math.PI + Math.sin(clock * 0.42) * 0.72 });
+    // showcase pose: the right hand holds a snowball in front of the hip
+    ch.armR.shoulder.rotation.x = 0.42;
+    ch.armR.shoulder.rotation.z = 0.18;
+    ch.armR.elbow.rotation.x = 0.62;
   }
 
   function resize() {
@@ -707,7 +746,18 @@ ui.customize?.addEventListener('click', (e) => {
   if (e.target instanceof Element && e.target.hasAttribute('data-cust-close')) setCustomizer(false);
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || !ui.customize || ui.customize.classList.contains('hidden')) return;
+  if (e.key !== 'Escape') return;
+  if (ui.infoPanel && !ui.infoPanel.classList.contains('hidden')) {
+    e.stopPropagation();
+    ui.infoPanel.classList.add('hidden');
+    return;
+  }
+  if (ui.optionsPanel && !ui.optionsPanel.classList.contains('hidden')) {
+    e.stopPropagation();
+    ui.optionsPanel.classList.add('hidden');
+    return;
+  }
+  if (!ui.customize || ui.customize.classList.contains('hidden')) return;
   e.stopPropagation();
   setCustomizer(false);
   ui.customizeBtn?.focus({ preventScroll: true });
@@ -725,8 +775,63 @@ ui.custRandom?.addEventListener('click', () => {
   preview.refresh();
 });
 
+function setMenuTab(name) {
+  document.querySelectorAll('.c7-tab').forEach((tab) => {
+    tab.classList.toggle('is-on', tab.dataset.menuTab === name);
+  });
+}
+function closeInfo() { ui.infoPanel?.classList.add('hidden'); }
+
+document.querySelectorAll('[data-menu-tab]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.menuTab;
+    if (btn.classList.contains('c7-tab')) setMenuTab(tab);
+    if (tab === 'look') {
+      closeInfo();
+      ui.optionsPanel?.classList.add('hidden');
+      setCustomizer(true);
+    } else if (tab === 'modes') {
+      closeInfo();
+      ui.optionsPanel?.classList.remove('hidden');
+      ui.botsSel?.focus();
+    } else if (tab === 'options') {
+      closeInfo();
+      ui.optionsPanel?.classList.toggle('hidden');
+    } else if (tab === 'info') {
+      ui.optionsPanel?.classList.add('hidden');
+      ui.infoPanel?.classList.remove('hidden');
+    } else {
+      closeInfo();
+      ui.optionsPanel?.classList.add('hidden');
+      setCustomizer(false);
+    }
+  });
+});
+
 ui.optionsBtn?.addEventListener('click', () => ui.optionsPanel.classList.toggle('hidden'));
 ui.optionsClose?.addEventListener('click', () => ui.optionsPanel.classList.add('hidden'));
+ui.infoClose?.addEventListener('click', closeInfo);
+ui.infoPanel?.addEventListener('click', (e) => { if (e.target === ui.infoPanel) closeInfo(); });
+ui.joinToggle?.addEventListener('click', () => {
+  ui.joinPanel.classList.toggle('hidden');
+  if (!ui.joinPanel.classList.contains('hidden')) ui.joinCode.focus();
+});
+ui.eventPlay?.addEventListener('click', () => ui.hostBtn.click());
+ui.fullscreenBtn?.addEventListener('click', async () => {
+  if (document.fullscreenElement) document.exitFullscreen?.();
+  else await goImmersive();
+});
+ui.rotateGo?.addEventListener('click', async () => { await goImmersive(); syncOrientation(); });
+ui.nameInput?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); ui.hostBtn.click(); }
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || !ui.menu || ui.menu.classList.contains('hidden')) return;
+  if (!ui.customize.classList.contains('hidden') || !ui.infoPanel.classList.contains('hidden') || !ui.optionsPanel.classList.contains('hidden')) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+  ui.hostBtn.click();
+});
 
 ui.fpsToggle?.addEventListener('change', () => {
   settings.showFps = ui.fpsToggle.checked;
@@ -751,6 +856,7 @@ preview.show();
 ui.hostBtn.addEventListener('click', async () => {
   audio.init();
   audio.setVolume(settings.vol);
+  if (isTouch) goImmersive();
   const name = (ui.nameInput.value.trim() || 'Gast').slice(0, 14);
   settings.name = name;
   saveSettings();
@@ -791,6 +897,7 @@ ui.hostBtn.addEventListener('click', async () => {
 ui.joinBtn.addEventListener('click', async () => {
   audio.init();
   audio.setVolume(settings.vol);
+  if (isTouch) goImmersive();
   const code = (ui.joinCode.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length < 4) {
     setMenuStatus('Bitte einen gültigen Raumcode eingeben.', 'err');
@@ -1137,6 +1244,11 @@ function resumeGame() {
   audio.init();
   audio.setVolume(settings.vol);
   closePause();
+  if (isTouch) {
+    G.mode = 'playing';
+    goImmersive();
+    return;
+  }
   const p = canvas.requestPointerLock();
   if (p && p.catch) p.catch(() => { /* fallback below */ });
   setTimeout(() => {
@@ -1158,6 +1270,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 canvas.addEventListener('click', () => {
+  if (isTouch) return;
   if (G.session && G.mode === 'playing' && document.pointerLockElement !== canvas) {
     canvas.requestPointerLock();
   }
@@ -1185,6 +1298,11 @@ function stanceReady() {
   return !!G.session && G.mode === 'playing' && !G.dead && G.spawned;
 }
 
+function syncTouchStance() {
+  ui.touchSprint?.classList.toggle('is-on', G.sprintToggle);
+  ui.touchDuck?.classList.toggle('is-on', G.crouchToggle);
+}
+
 function toggleSprint() {
   if (!stanceReady()) return;
   G.sprintToggle = !G.sprintToggle;
@@ -1193,6 +1311,7 @@ function toggleSprint() {
     G.sliding = false;
     G.slideT = 0;
   }
+  syncTouchStance();
 }
 
 function toggleCrouch() {
@@ -1200,15 +1319,18 @@ function toggleCrouch() {
   if (G.sliding) {
     G.sliding = false;
     G.crouchToggle = true;
+    syncTouchStance();
     return;
   }
   const speed = Math.hypot(moveDir.x, moveDir.z);
   if (G.sprintToggle && G.grounded && speed > PLAYER.walk * 0.8) {
     startSlide(speed);
+    syncTouchStance();
     return;
   }
   G.crouchToggle = !G.crouchToggle;
   if (G.crouchToggle) G.sprintToggle = false;
+  syncTouchStance();
 }
 
 function startSlide(speed) {
@@ -1301,16 +1423,20 @@ document.addEventListener('mousemove', (e) => {
   G.mouseSwayY = THREE.MathUtils.clamp(G.mouseSwayY + e.movementY * 0.05, -12, 12);
 });
 
-document.addEventListener('mousedown', (e) => {
-  if (e.button !== 0) return;
-  audio.init();
+function beginCharge() {
   if (G.mode !== 'playing' || !G.session || G.dead) return;
-  if (!hasMouse()) return;
-  if (G.cooldown > 0) return;
+  if (G.cooldown > 0 || G.charging) return;
   G.charging = true;
   G.charge = 0;
   ui.chargeRing.classList.add('active');
   ui.chargeLabel.classList.add('show');
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  audio.init();
+  if (!hasMouse()) return;
+  beginCharge();
 });
 
 document.addEventListener('mouseup', (e) => {
@@ -1321,6 +1447,93 @@ document.addEventListener('mouseup', (e) => {
 });
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ---------------------------------------------------------------------------
+// Touch input: left stick, drag-to-look, hold-to-throw and stance buttons.
+// ---------------------------------------------------------------------------
+let stickId = null;
+function updateStick(e) {
+  if (!ui.stick) return;
+  const r = ui.stick.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let dx = (e.clientX - cx) / (r.width / 2);
+  let dy = (e.clientY - cy) / (r.height / 2);
+  const len = Math.hypot(dx, dy);
+  if (len > 1) { dx /= len; dy /= len; }
+  if (Math.hypot(dx, dy) < 0.16) { dx = 0; dy = 0; }
+  G.touchX = dx;
+  G.touchY = dy;
+  if (ui.stickKnob) ui.stickKnob.style.transform = `translate(${dx * 33}px, ${dy * 33}px)`;
+}
+function endStick(e) {
+  if (e.pointerId !== stickId) return;
+  stickId = null;
+  G.touchX = 0;
+  G.touchY = 0;
+  if (ui.stickKnob) ui.stickKnob.style.transform = '';
+}
+ui.stick?.addEventListener('pointerdown', (e) => {
+  if (!isTouch) return;
+  e.preventDefault();
+  stickId = e.pointerId;
+  try { ui.stick.setPointerCapture(e.pointerId); } catch {}
+  updateStick(e);
+});
+ui.stick?.addEventListener('pointermove', (e) => { if (e.pointerId === stickId) updateStick(e); });
+ui.stick?.addEventListener('pointerup', endStick);
+ui.stick?.addEventListener('pointercancel', endStick);
+
+let lookId = null, lookX = 0, lookY = 0;
+canvas.addEventListener('pointerdown', (e) => {
+  if (!isTouch || e.pointerType === 'mouse') return;
+  if (!G.session || G.mode !== 'playing' || G.dead) return;
+  lookId = e.pointerId;
+  lookX = e.clientX;
+  lookY = e.clientY;
+  try { canvas.setPointerCapture(e.pointerId); } catch {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== lookId) return;
+  const dx = e.clientX - lookX, dy = e.clientY - lookY;
+  lookX = e.clientX;
+  lookY = e.clientY;
+  const s = 0.0034 * settings.sens;
+  G.yaw -= dx * s;
+  G.pitch = Math.max(-1.5, Math.min(1.5, G.pitch - dy * s));
+});
+function endLook(e) { if (e.pointerId === lookId) lookId = null; }
+canvas.addEventListener('pointerup', endLook);
+canvas.addEventListener('pointercancel', endLook);
+
+ui.touchThrow?.addEventListener('pointerdown', (e) => {
+  if (!isTouch) return;
+  e.preventDefault();
+  audio.init();
+  try { ui.touchThrow.setPointerCapture(e.pointerId); } catch {}
+  beginCharge();
+});
+ui.touchThrow?.addEventListener('pointerup', (e) => {
+  if (!isTouch) return;
+  e.preventDefault();
+  if (G.charging) { G.charging = false; throwSnowball(); }
+});
+ui.touchThrow?.addEventListener('pointercancel', () => {
+  if (G.charging) {
+    G.charging = false;
+    G.charge = 0;
+    ui.chargeRing.classList.remove('active');
+    ui.chargeLabel.classList.remove('show');
+  }
+});
+ui.touchJump?.addEventListener('click', () => { if (stanceReady()) G.jumpBuf = 0.16; });
+ui.touchDuck?.addEventListener('click', () => { toggleCrouch(); syncTouchStance(); });
+ui.touchSprint?.addEventListener('click', () => { toggleSprint(); syncTouchStance(); });
+ui.touchScore?.addEventListener('click', () => {
+  if (!G.session) return;
+  const nowHidden = ui.scoreboard.classList.toggle('hidden');
+  if (!nowHidden) renderScoreboard(true);
+});
+ui.scoreboard?.addEventListener('pointerdown', () => { if (isTouch) ui.scoreboard.classList.add('hidden'); });
 
 // ---------------------------------------------------------------------------
 // Throw
@@ -1509,13 +1722,15 @@ function updateLocalPlayer(dt, realDt = dt) {
 
   const alive = !G.dead;
   let wishX = 0, wishZ = 0;
-  if (alive && G.mode === 'playing' && hasMouse()) {
-    const f = G.keys.has('KeyW') ? 1 : 0;
-    const b = G.keys.has('KeyS') ? 1 : 0;
-    const l = G.keys.has('KeyA') ? 1 : 0;
-    const r = G.keys.has('KeyD') ? 1 : 0;
-    const fwd = f - b;
-    const side = r - l;
+  if (alive && G.mode === 'playing' && (hasMouse() || isTouch)) {
+    let fwd = 0, side = 0;
+    if (isTouch && Math.hypot(G.touchX, G.touchY) > 0.12) {
+      fwd = -G.touchY;
+      side = G.touchX;
+    } else {
+      fwd = (G.keys.has('KeyW') ? 1 : 0) - (G.keys.has('KeyS') ? 1 : 0);
+      side = (G.keys.has('KeyD') ? 1 : 0) - (G.keys.has('KeyA') ? 1 : 0);
+    }
     if (fwd || side) {
       const sin = Math.sin(G.yaw), cos = Math.cos(G.yaw);
       wishX = -sin * fwd + cos * side;
@@ -1549,7 +1764,8 @@ function updateLocalPlayer(dt, realDt = dt) {
       G.sliding = false;
     } else {
       const speed = G.slideSpeed * (1 - 0.62 * k * k);
-      const steer = (G.keys.has('KeyD') ? 1 : 0) - (G.keys.has('KeyA') ? 1 : 0);
+      const steer = ((G.keys.has('KeyD') ? 1 : 0) - (G.keys.has('KeyA') ? 1 : 0)) ||
+        (isTouch && Math.abs(G.touchX) > 0.2 ? Math.sign(G.touchX) : 0);
       if (steer) {
         const a = steer * dt * 1.45;
         const c = Math.cos(a), s = Math.sin(a);

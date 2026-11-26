@@ -2,7 +2,10 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>SNOWBALL WARFARE — Ein Treffer. Tot.</title>
 <meta name="description" content="Cartoon-Multiplayer-Schneeballshooter im Schneesturm. Ein Treffer und du bist raus." />
 <meta name="theme-color" content="#102b35" />
@@ -48,6 +51,17 @@
     <div id="stance">1 TREFFER &middot; AUS</div>
   </div>
 
+  <div id="touchControls">
+    <div id="stick" aria-label="Bewegen"><i id="stickKnob"></i></div>
+    <div id="touchSide">
+      <button type="button" id="touchSprint">SPRINT</button>
+      <button type="button" id="touchDuck">DUCKEN</button>
+      <button type="button" id="touchJump">SPRUNG</button>
+      <button type="button" id="touchScore">LISTE</button>
+    </div>
+    <button type="button" id="touchThrow"><b>WERFEN</b><span>HALTEN &amp; ZIELEN</span></button>
+  </div>
+
   <div id="toast"></div>
 </div>
 
@@ -66,88 +80,91 @@
 <!-- ===================== START MENU ===================== -->
 <div id="menu" class="fullscreen menu-c7">
   <div class="menu-bg" aria-hidden="true"></div>
-  <div class="c7-haze" aria-hidden="true"></div>
+  <div class="menu-shade" aria-hidden="true"></div>
 
-  <header class="c7-top">
+  <header class="c7-nav">
     <div class="c7-wordmark"><i>&#10052;</i> SNOWBALL <span>WARFARE</span></div>
-    <div class="c7-top-meta">
-      <span class="c7-live"><i class="dot-live"></i> P2P &middot; OHNE ACCOUNT</span>
-      <button class="c7-gear" id="optionsBtn" title="Optionen" aria-label="Optionen">&#9881;</button>
+    <nav class="c7-tabs" aria-label="Hauptmenü">
+      <button type="button" class="c7-tab is-on" data-menu-tab="play">SPIELEN</button>
+      <button type="button" class="c7-tab" data-menu-tab="look">LOOK <b>NEU</b></button>
+      <button type="button" class="c7-tab" data-menu-tab="modes">MODUS</button>
+      <button type="button" class="c7-tab" data-menu-tab="options">OPTIONEN</button>
+      <button type="button" class="c7-tab" data-menu-tab="info">INFO</button>
+    </nav>
+    <div class="c7-nav-right">
+      <span class="c7-players" title="Spieler"><i>&#128101;</i><b>1</b></span>
+      <button type="button" class="c7-menu-btn" id="optionsBtn" aria-haspopup="dialog" aria-controls="optionsPanel">MENÜ <i>&#9776;</i></button>
     </div>
   </header>
 
-  <main class="c7-panel">
-    <div class="c7-eyebrow"><i></i> SEASON 01 &middot; SCHNEEBALLSHOOTER</div>
-    <h1 class="c7-title">SNOWBALL<br /><em>WARFARE</em></h1>
-
-    <div class="c7-stats">
-      <div><b>1</b><span>TREFFER &middot; AUS</span></div>
-      <div><b>6</b><span>SPIELER MAX</span></div>
-      <div><b>0&ndash;5</b><span>BOTS</span></div>
-    </div>
-
-    <label class="c7-identity">
-      <span class="c7-label">DEIN NAME</span>
-      <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
-    </label>
-
-    <button class="c7-start" id="hostBtn">
-      <span class="c7-start-main">SPIELEN<small>RAUM ERSTELLEN</small></span>
-      <span class="c7-start-key"><kbd>ENTER</kbd></span>
-    </button>
-    <div id="menuStatus" class="c7-status">Bereit.</div>
-
-    <div class="c7-or"><i></i><span>ODER MIT RAUMCODE</span><i></i></div>
-    <div class="c7-join">
-      <div class="c7-join-row">
-        <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
-        <button id="joinBtn">BEITRETEN</button>
-      </div>
-    </div>
-
-    <div class="c7-locker">
-      <div class="c7-locker-head">
-        <b>DEIN LOOK</b>
-        <i class="c7-locker-line" aria-hidden="true"></i>
-        <small id="lookSummary">Blau &middot; Weiss &middot; Hell</small>
-      </div>
-      <button class="c7-lookcard" id="customizeBtn" aria-haspopup="dialog" aria-controls="customize">
-        <span class="c7-lookcard-dots" id="lookDots" aria-hidden="true"></span>
-        <span class="c7-lookcard-text">
-          <b>ANPASSEN</b>
-          <small>JACKE &middot; KRAGEN &middot; M&Uuml;TZE &middot; HAUT</small>
-        </span>
-        <i class="c7-lookcard-arrow" aria-hidden="true">&#8594;</i>
+  <div class="c7-layout">
+    <aside class="c7-left" aria-label="Saison und Updates">
+      <button type="button" class="c7-card c7-card-pass" data-menu-tab="info">
+        <span class="c7-card-tag">MISSION</span>
+        <span class="c7-card-big">1</span>
+        <span class="c7-card-title">TREFFER</span>
+        <span class="c7-card-bar"><i></i></span>
+        <span class="c7-card-foot">DANN BIST DU RAUS</span>
       </button>
-    </div>
-  </main>
 
-  <section class="c7-stage" aria-label="Charakter-Vorschau">
-    <div class="c7-stage-num" aria-hidden="true">01</div>
-    <div class="c7-stage-rail" aria-hidden="true">SNOWBALL WARFARE &middot; SEASON 01</div>
-    <div class="c7-stage-glow"></div>
-    <div class="c7-stage-floor"></div>
-    <canvas id="preview"></canvas>
-    <div class="c7-stage-tags">
-      <span><i class="dot-live"></i> LOBBY</span>
-    </div>
-    <div class="c7-stage-copy">DEIN RIDER<br /><small>LIVE-VORSCHAU</small></div>
-  </section>
+      <button type="button" class="c7-card c7-card-news" id="customizeBtn" aria-haspopup="dialog" aria-controls="customize" aria-expanded="false">
+        <span class="c7-card-news-art" aria-hidden="true"></span>
+        <span class="c7-card-tag c7-card-tag-new">NEU</span>
+        <span class="c7-card-news-copy">
+          <b>DEIN LOOK</b>
+          <span>JACKE &middot; KRAGEN &middot; M&Uuml;TZE &middot; HAUT</span>
+          <span id="lookSummary" class="c7-look-summary">Blau &middot; Weiss &middot; Hell</span>
+          <i id="lookDots" class="c7-card-dots" aria-hidden="true"></i>
+        </span>
+        <i class="c7-card-arrow" aria-hidden="true">&#8594;</i>
+      </button>
+
+      <button type="button" class="c7-card c7-card-event" id="eventPlay">
+        <span class="c7-card-tag">SAISON 01</span>
+        <span class="c7-card-title">SCHNEEBALL<br />SCHLACHT</span>
+        <span class="c7-card-foot">JETZT SPIELEN <i aria-hidden="true">&#8599;</i></span>
+      </button>
+    </aside>
+
+    <section class="c7-stage" aria-label="Charakter-Vorschau">
+      <canvas id="preview"></canvas>
+      <div class="c7-player-label">PLAYER</div>
+    </section>
+
+    <aside class="c7-right" aria-label="Spielmodus">
+      <div class="c7-mode">
+        <header class="c7-mode-head"><span>SPIELMODUS</span><i aria-hidden="true">&#8250;</i></header>
+        <div class="c7-mode-name">SOLO</div>
+        <div class="c7-mode-meta"><span><b>0&ndash;5</b> BOTS</span><span><b>6</b> SPIELER MAX</span></div>
+
+        <label class="c7-name">
+          <span>DEIN NAME</span>
+          <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
+        </label>
+
+        <button type="button" class="c7-deploy" id="hostBtn">
+          <span>DEPLOY<small>RAUM ERSTELLEN</small></span>
+          <i aria-hidden="true">&#8599;</i>
+        </button>
+        <div id="menuStatus" class="c7-status">Bereit.</div>
+
+        <button type="button" class="c7-join-toggle" id="joinToggle">RAUMCODE EINGEBEN <i aria-hidden="true">+</i></button>
+        <div class="c7-join hidden" id="joinPanel">
+          <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
+          <button type="button" id="joinBtn">BEITRETEN</button>
+        </div>
+      </div>
+    </aside>
+  </div>
 
   <footer class="c7-foot">
     <span>&copy; 2026 SNOWBALL WARFARE</span>
-    <span class="c7-foot-keys">
-      <kbd>SHIFT</kbd> SPRINT
-      <b>&middot;</b>
-      <kbd>CTRL</kbd> DUCKEN / SLIDE
-      <b>&middot;</b>
-      <kbd>LMB</kbd> WERFEN
-    </span>
+    <span class="c7-foot-hint"><b>ENTER</b> START &middot; <b>ESC</b> PAUSE</span>
   </footer>
 
-  <section class="c7-options hidden" id="optionsPanel">
+  <section class="c7-options hidden" id="optionsPanel" role="dialog" aria-modal="true" aria-labelledby="optionsTitle">
     <div class="c7-opt-head">
-      <b>OPTIONEN</b>
+      <b id="optionsTitle">OPTIONEN</b>
       <button class="c7-gear" id="optionsClose" aria-label="Schliessen">&times;</button>
     </div>
     <label class="field">
@@ -180,6 +197,7 @@
       <input type="checkbox" id="fpsToggle" />
       <span>FPS-ANZEIGE <kbd>F</kbd></span>
     </label>
+    <button type="button" class="c7-opt-wide" id="fullscreenBtn">VOLLBILD</button>
     <div class="c7-keys">
       <div><kbd>WASD</kbd><span>Bewegen</span></div>
       <div><kbd>SHIFT</kbd><span>Sprint tippen</span></div>
@@ -192,12 +210,33 @@
     </div>
   </section>
 
+  <div id="infoPanel" class="c7-info hidden" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+    <div class="c7-info-card">
+      <header class="c7-info-head">
+        <div>
+          <small>SNOWBALL WARFARE &middot; SEASON 01</small>
+          <h2 id="infoTitle">SO GEHT'S</h2>
+        </div>
+        <button class="c7-gear" id="infoClose" aria-label="Schliessen">&times;</button>
+      </header>
+      <div class="c7-info-grid">
+        <div><b>01</b><span>EIN TREFFER</span><p>Wer getroffen wird, ist raus. Kein Respawn, kein Nachladen.</p></div>
+        <div><b>02</b><span>SECHS SPIELER</span><p>Ein Raum, bis zu sechs Spieler. Solo gegen Bots oder mit Freunden per Code.</p></div>
+        <div><b>03</b><span>WERFEN</span><p>Maustaste oder Finger halten, zielen, loslassen. Je l&auml;nger du h&auml;ltst, desto h&auml;rter der Wurf.</p></div>
+      </div>
+      <div class="c7-info-keys">
+        <span><kbd>WASD</kbd> BEWEGEN</span><span><kbd>SHIFT</kbd> SPRINT</span><span><kbd>CTRL</kbd> DUCKEN</span><span><kbd>SPACE</kbd> SPRUNG</span><span><kbd>LMB</kbd> WERFEN</span><span><kbd>TAB</kbd> LISTE</span>
+      </div>
+      <p class="c7-info-note">Auf dem Handy: Querformat, Joystick links, Blick rechts, Werfen-Button unten rechts.</p>
+    </div>
+  </div>
+
   <div id="customize" class="c7-customize hidden" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
     <div class="c7-customize-scrim" data-cust-close aria-hidden="true"></div>
     <section class="c7-customize-card">
       <header class="c7-cust-head">
         <div>
-          <small>DEIN RIDER</small>
+          <small>DEIN PLAYER</small>
           <h2 id="customizeTitle">ANPASSEN</h2>
         </div>
         <button class="c7-gear" id="customizeClose" aria-label="Schliessen">&times;</button>
@@ -220,6 +259,14 @@
     <div class="spinner"></div>
     <div id="loadingText">Raum wird erstellt &hellip;</div>
   </div>
+</div>
+
+<!-- ===================== ROTATE / FULLSCREEN ===================== -->
+<div id="rotate" role="alert">
+  <div class="rotate-phone" aria-hidden="true"><i></i></div>
+  <b>QUERFORMAT</b>
+  <span>Drehe dein Ger&auml;t, um Snowball Warfare zu spielen.</span>
+  <button type="button" id="rotateGo">VOLLBILD &amp; WEITER</button>
 </div>
 
 <!-- ===================== PAUSE ===================== -->
