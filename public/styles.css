@@ -457,7 +457,7 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 0;
   pointer-events: none;
   z-index: 2;
-  background: radial-gradient(120% 96% at 50% 44%, transparent 58%, rgba(1, 4, 8, 0.66) 100%);
+  background: radial-gradient(120% 96% at 50% 44%, transparent 60%, rgba(1, 4, 8, 0.52) 100%);
 }
 
 /* ---- header ---- */
@@ -527,17 +527,67 @@ input[type="range"]::-webkit-slider-thumb {
 .v3-gear:hover { color: #fff; border-color: rgba(143, 211, 255, 0.7); transform: rotate(45deg); }
 
 /* ---- stage ---- */
-.v3-stage { position: relative; flex: 1 1 auto; width: 100%; min-height: 0; z-index: 1; }
-#preview { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.v3-halo {
+.v3-stage { position: relative; flex: 1 1 auto; width: 100%; min-height: 0; z-index: 1; overflow: hidden; }
+#preview {
   position: absolute;
-  left: 50%;
-  top: 46%;
-  width: min(78vh, 740px);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(126, 190, 244, 0.15), rgba(126, 190, 244, 0.035) 44%, transparent 68%);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 100%);
+}
+/* the scene runs edge to edge; this scrim only buys contrast for the copy */
+.v3-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(3, 9, 16, 0.8) 0%, rgba(3, 9, 16, 0.46) 20%, rgba(3, 9, 16, 0.12) 40%, transparent 58%),
+    linear-gradient(180deg, rgba(3, 9, 16, 0.3), transparent 13%, transparent 94%, rgba(3, 9, 16, 0.34));
+}
+.v3-hero {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: min(38%, 380px);
+  padding-right: 20px;
+  pointer-events: none;
+}
+.v3-kicker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: #b6e0ff;
+  text-shadow: 0 1px 12px rgba(3, 9, 16, 0.9);
+}
+.v3-kicker i { width: 22px; height: 1px; flex: 0 0 auto; background: linear-gradient(90deg, #8fd3ff, transparent); }
+.v3-hero h2 {
+  margin: 16px 0 14px;
+  font-size: clamp(30px, 3.6vw, 52px);
+  line-height: 0.94;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: #f7fbff;
+  text-shadow: 0 4px 30px rgba(3, 9, 16, 0.78);
+}
+.v3-hero h2 span { color: #93d6ff; }
+.v3-hero p {
+  margin: 0;
+  max-width: 300px;
+  font-size: 11px;
+  line-height: 1.75;
+  letter-spacing: 0.03em;
+  color: rgba(222, 240, 255, 0.72);
+  text-shadow: 0 2px 14px rgba(3, 9, 16, 0.95);
 }
 
 /* ---- play ---- */
@@ -563,13 +613,13 @@ input[type="range"]::-webkit-slider-thumb {
   background: linear-gradient(180deg, #e9f8ff 0%, #bae5ff 48%, #8bcdf3 100%);
   color: #061522;
   cursor: pointer;
-  box-shadow: 0 14px 34px rgba(24, 92, 142, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(5, 17, 28, 0.28), 0 16px 40px rgba(3, 12, 22, 0.55), 0 14px 34px rgba(24, 92, 142, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
 }
 .play-btn:hover {
   transform: translateY(-2px);
   filter: brightness(1.05);
-  box-shadow: 0 20px 44px rgba(40, 118, 172, 0.5), inset 0 1px 0 #fff;
+  box-shadow: 0 0 0 1px rgba(5, 17, 28, 0.24), 0 22px 50px rgba(3, 12, 22, 0.6), 0 20px 44px rgba(40, 118, 172, 0.4), inset 0 1px 0 #fff;
 }
 .play-btn:active { transform: translateY(0); }
 .play-btn:disabled { filter: saturate(0.45) brightness(0.85); cursor: wait; }
@@ -582,7 +632,8 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 8px;
   font-size: 8px;
   letter-spacing: 0.22em;
-  color: rgba(198, 226, 250, 0.42);
+  color: rgba(206, 232, 254, 0.62);
+  text-shadow: 0 1px 10px rgba(3, 9, 16, 0.9);
 }
 .v3-play-note kbd {
   font-size: 7px;
@@ -599,7 +650,8 @@ input[type="range"]::-webkit-slider-thumb {
   text-align: center;
   font-size: 9px;
   letter-spacing: 0.1em;
-  color: rgba(198, 226, 250, 0.5);
+  color: rgba(230, 244, 255, 0.86);
+  text-shadow: 0 1px 8px rgba(3, 9, 16, 0.95), 0 0 2px rgba(3, 9, 16, 0.85);
 }
 
 /* ---- dock ---- */
@@ -754,10 +806,14 @@ input[type="range"]::-webkit-slider-thumb {
       "name join"
       "looks looks";
   }
+  .v3-hero { width: 34%; }
+  .v3-hero h2 { font-size: clamp(27px, 3.1vw, 40px); }
+  .v3-hero p { font-size: 10px; }
 }
 @media (max-width: 860px) {
   .menu-v3 { gap: 8px; }
   .v3-meta { display: none; }
+  .v3-hero { display: none; }
   .v3-play {
     position: relative;
     right: auto;

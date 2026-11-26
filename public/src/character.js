@@ -787,11 +787,11 @@ function materialsFor(idx, look) {
       clearcoat: 0.35, clearcoatRoughness: 0.55, envMapIntensity: 0.9
     }),
     boot: new THREE.MeshPhysicalMaterial({
-      color: 0x242832, roughness: 0.66, metalness: 0.03,
+      color: 0x76818f, roughness: 0.58, metalness: 0.03,
       normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.26, 0.26),
-      clearcoat: 0.18, clearcoatRoughness: 0.6, envMapIntensity: 0.7
+      clearcoat: 0.22, clearcoatRoughness: 0.58, envMapIntensity: 0.8
     }),
-    sole: new THREE.MeshStandardMaterial({ color: 0xeef2f7, roughness: 0.82, metalness: 0 }),
+    sole: new THREE.MeshStandardMaterial({ color: 0xc3cdd8, roughness: 0.8, metalness: 0 }),
     metal: new THREE.MeshStandardMaterial({ color: 0x9aa4ad, roughness: 0.32, metalness: 0.9, envMapIntensity: 1.2 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x14181d, roughness: 0.62, metalness: 0.08, envMapIntensity: 0.6 }),
     lens: new THREE.MeshPhysicalMaterial({
@@ -1001,41 +1001,83 @@ export function createCharacter(colorIdx, look) {
   hips.add(torsoGroup);
 
   const jacketSections = [
-    [-0.072, 0.174, 0.138], [-0.042, 0.177, 0.141], [-0.012, 0.171, 0.136],
-    [0.050, 0.168, 0.135], [0.130, 0.170, 0.138], [0.210, 0.177, 0.142],
+    [-0.125, 0.181, 0.148], [-0.100, 0.180, 0.147], [-0.070, 0.176, 0.142],
+    [-0.030, 0.171, 0.137], [0.050, 0.168, 0.135], [0.130, 0.170, 0.138], [0.210, 0.177, 0.142],
     [0.285, 0.185, 0.147], [0.350, 0.191, 0.151], [0.405, 0.194, 0.153],
     [0.448, 0.191, 0.150], [0.478, 0.181, 0.145], [0.505, 0.163, 0.136],
     [0.530, 0.138, 0.124], [0.552, 0.112, 0.112], [0.570, 0.094, 0.104]
   ];
-  const torso = add(torsoGroup, loftGeometry(jacketSections, 32), m.jacket, [0, 0, 0]);
+  // sample the base silhouette, then add a soft horizontal quilt: the shell
+  // now reads as a down jacket instead of a painted blue box
+  const jacketAt = (y) => {
+    if (y <= jacketSections[0][0]) return [jacketSections[0][1], jacketSections[0][2]];
+    for (let k = 1; k < jacketSections.length; k++) {
+      const a = jacketSections[k - 1], b = jacketSections[k];
+      if (y <= b[0]) {
+        const t = (y - a[0]) / (b[0] - a[0] || 1);
+        return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+      }
+    }
+    const last = jacketSections[jacketSections.length - 1];
+    return [last[1], last[2]];
+  };
+  const quiltAt = (y) => {
+    const t = (y + 0.125) / 0.695;
+    const env = Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, t)))), 0.35);
+    return 0.0028 * Math.cos(((y - 0.012) / 0.150) * Math.PI * 2) * env;
+  };
+  const quiltedSections = [];
+  for (let i = 0; i < 56; i++) {
+    const y = -0.125 + 0.695 * (i / 55);
+    const base = jacketAt(y);
+    const q = quiltAt(y);
+    quiltedSections.push([y, base[0] + q, base[1] + q]);
+  }
+  const torso = add(torsoGroup, loftGeometry(quiltedSections, 32), m.jacket, [0, 0, 0]);
   torso.castShadow = true;
+  // stitch seams at the inward folds of the quilt
+  for (const y of [-0.063, 0.087, 0.237, 0.387]) {
+    const base = jacketAt(y);
+    const q = quiltAt(y);
+    const band = [];
+    for (let i = 0; i <= 3; i++) {
+      const yy = y - 0.0018 + 0.0036 * (i / 3);
+      const bulge = i === 1 || i === 2 ? 0.0008 : 0;
+      band.push([yy, base[0] + q + bulge, base[1] + q + bulge]);
+    }
+    add(torsoGroup, loftGeometry(band, 32), m.jacketDark, [0, 0, 0]);
+  }
 
   // ribbed hem: a darker band ends the jacket, so the torso does not read as
   // one endless blue box
   add(torsoGroup, loftGeometry([
-    [-0.075, 0.177, 0.123], [-0.058, 0.181, 0.126], [-0.042, 0.178, 0.123]
+    [-0.128, 0.184, 0.151], [-0.112, 0.185, 0.152], [-0.094, 0.181, 0.147]
   ], 30), m.jacketDark);
+
+  // deltoid caps: they close the armpit gap between the shell and the sleeve
+  for (const side of [-1, 1]) {
+    add(torsoGroup, new THREE.SphereGeometry(0.072, 20, 16), m.jacket,
+      [side * 0.154, 0.446, 0], null, [1.0, 0.9, 0.95]);
+  }
+
+  // bunched hood behind the neck: gives the collar a reason to exist
+  add(torsoGroup, new THREE.SphereGeometry(1, 20, 14), m.jacketDark,
+    [0, 0.512, 0.115], [-0.18, 0, 0], [0.150, 0.092, 0.105]);
 
   // zip: sampled along the shell profile so the tape hugs the chest instead of
   // cutting a straight box through the curve
   const zipPts = [];
   for (let i = 0; i <= 26; i++) {
-    const y = -0.064 + (0.560 + 0.064) * (i / 26);
-    let d = jacketSections[jacketSections.length - 1][2];
-    for (let k = 1; k < jacketSections.length; k++) {
-      const a = jacketSections[k - 1], b = jacketSections[k];
-      if (y >= a[0] && y <= b[0]) {
-        const t = (y - a[0]) / (b[0] - a[0] || 1);
-        d = a[2] + (b[2] - a[2]) * t;
-        break;
-      }
-      if (y < jacketSections[0][0]) { d = jacketSections[0][2]; break; }
-    }
+    const y = -0.118 + (0.560 + 0.118) * (i / 26);
+    const d = jacketAt(y)[1] + quiltAt(y);
     zipPts.push(new THREE.Vector3(0, y, -(d + 0.0032)));
   }
-  // the reference's wide white zip band, laid on the chest curve
-  add(torsoGroup, ribbonGeometry(zipPts, 0.0140), m.scarf);
+  // a narrow zipper tape on the chest curve, with a small metal pull
+  add(torsoGroup, ribbonGeometry(zipPts, 0.0060), m.jacketDark);
+  add(torsoGroup, ribbonGeometry(zipPts.map((p) => new THREE.Vector3(p.x, p.y, p.z - 0.0007)), 0.0024), m.sole);
   const zipTop = zipPts[zipPts.length - 1];
+  add(torsoGroup, new THREE.BoxGeometry(0.009, 0.020, 0.005), m.metal,
+    [0, zipTop.y - 0.028, zipTop.z - 0.004]);
 
   // ---- neck / head ------------------------------------------------------
   // One sculpted head. Every feature sits at a measured position: eyes at the
@@ -1045,7 +1087,7 @@ export function createCharacter(colorIdx, look) {
 
   const headGroup = new THREE.Group();
   headGroup.position.set(0, 0.766, -0.006);
-  headGroup.scale.setScalar(1.94);      // the reference's chibi head-to-body ratio
+  headGroup.scale.setScalar(1.74);      // stylised, but no longer a bobblehead
   hips.add(headGroup);
 
   const headMesh = add(headGroup, headGeometry(), m.face, [0, 0, 0]);
@@ -1056,10 +1098,10 @@ export function createCharacter(colorIdx, look) {
   const blinkers = [];
   for (const side of [-1, 1]) {
     // brows are mirrored, so the arch lifts outwards on both sides
-    add(headGroup, decalGeometry(side * 0.038, 0.033, -0.079, 0.044, 0.012, 14, 6),
+    add(headGroup, decalGeometry(side * 0.038, 0.033, -0.079, 0.046, 0.012, 14, 6),
       side < 0 ? m.browDecalL : m.browDecal);
     // one almond patch for both open and shut, so the blink cannot slip
-    const patch = decalGeometry(side * 0.037, -0.006, -0.085, 0.055, 0.058, 24, 26);
+    const patch = decalGeometry(side * 0.0375, -0.006, -0.085, 0.058, 0.061, 24, 26);
     const openEye = new THREE.Mesh(patch, m.eyeOpen);
     openEye.renderOrder = 3;
     headGroup.add(openEye);
@@ -1105,8 +1147,8 @@ export function createCharacter(colorIdx, look) {
   // the top sections of the shell, so it wraps the neck like real trim instead
   // of floating as a torus. The head hides the middle; the sides stay white.
   const collarSections = [
-    [0.506, 0.172, 0.140], [0.522, 0.166, 0.136], [0.538, 0.156, 0.130],
-    [0.552, 0.142, 0.121], [0.566, 0.122, 0.112], [0.580, 0.100, 0.104]
+    [0.508, 0.160, 0.134], [0.524, 0.153, 0.130], [0.540, 0.144, 0.124],
+    [0.552, 0.132, 0.117], [0.562, 0.118, 0.110], [0.572, 0.104, 0.104]
   ];
   const collar = add(torsoGroup, loftGeometry(collarSections, 30), m.scarf, [0, 0, 0]);
   collar.castShadow = true;
@@ -1117,12 +1159,16 @@ export function createCharacter(colorIdx, look) {
   // a gap when it folded. A single tube with a weight blend across the joint
   // bends like cloth.
   const armProfile = (t) => {
-    if (t < 0.05) return 0.030 + (t / 0.05) * 0.042;    // cap tucked in the body
-    if (t < 0.18) return 0.0720 - (t - 0.05) * 0.060;   // deltoid
-    if (t < 0.44) return 0.0642 - (t - 0.18) * 0.030;   // upper sleeve
-    if (t < 0.56) return 0.0564 - (t - 0.44) * 0.008;   // elbow
-    if (t < 0.88) return 0.0554 + (t - 0.56) * 0.004;   // forearm
-    return 0.0567 - (t - 0.88) / 0.12 * 0.012;          // wrist
+    let r;
+    if (t < 0.05) r = 0.030 + (t / 0.05) * 0.042;        // cap tucked in the body
+    else if (t < 0.18) r = 0.0720 - (t - 0.05) * 0.060;  // deltoid
+    else if (t < 0.44) r = 0.0642 - (t - 0.18) * 0.030;  // upper sleeve
+    else if (t < 0.56) r = 0.0564 - (t - 0.44) * 0.008;  // elbow
+    else if (t < 0.88) r = 0.0554 + (t - 0.56) * 0.004;  // forearm
+    else r = 0.0567 - ((t - 0.88) / 0.12) * 0.012;       // wrist
+    // quilted sleeve: soft horizontal ribs from the deltoid to the cuff
+    const quilt = t > 0.14 ? 0.0022 * Math.cos((t - 0.16) * 26) * Math.min(1, (t - 0.14) / 0.10) : 0;
+    return r + quilt;
   };
   function makeArm(side) {
     const shoulder = new THREE.Bone();
@@ -1135,21 +1181,21 @@ export function createCharacter(colorIdx, look) {
     shoulder.add(elbow);
 
     const armGeo = limbGeometry(0, 0, 0, 0.30, 0.30, armProfile, { rings: 30, radial: 18, blend: 0.070 });
-    const arm = new THREE.SkinnedMesh(armGeo, m.jacketDark);
+    const arm = new THREE.SkinnedMesh(armGeo, m.jacket);
     arm.castShadow = true; arm.receiveShadow = true;
     shoulder.add(arm);
     root.updateMatrixWorld(true);
     arm.bind(new THREE.Skeleton([shoulder, elbow]), arm.matrixWorld.clone());
 
     // white knit cuff at the wrist, then one soft mitten (palm + thumb)
-    add(elbow, new THREE.CylinderGeometry(0.058, 0.060, 0.056, 18), m.scarf, [0, -0.262, 0]);
+    add(elbow, new THREE.CylinderGeometry(0.052, 0.055, 0.044, 18), m.scarf, [0, -0.266, 0]);
     const hand = new THREE.Group();
     hand.position.y = -0.290;
     elbow.add(hand);
-    add(hand, new THREE.CapsuleGeometry(0.056, 0.058, 5, 16), m.mitten,
-      [0, -0.052, -0.004], [0.06, 0, 0], [1.02, 1.05, 0.9]);
-    add(hand, new THREE.CapsuleGeometry(0.023, 0.046, 4, 12), m.mitten,
-      [side * -0.044, -0.044, -0.014], [0.30, 0, side * 0.95]);
+    add(hand, new THREE.CapsuleGeometry(0.052, 0.055, 5, 16), m.mitten,
+      [0, -0.050, -0.004], [0.06, 0, 0], [1.02, 1.05, 0.9]);
+    add(hand, new THREE.CapsuleGeometry(0.021, 0.044, 4, 12), m.mitten,
+      [side * -0.041, -0.042, -0.014], [0.30, 0, side * 0.95]);
     return { shoulder, elbow, hand };
   }
   const armR = makeArm(1);
@@ -1183,11 +1229,11 @@ export function createCharacter(colorIdx, look) {
   // one trouser leg over a hip and a knee bone: the knee folds smoothly instead
   // of showing the seam between two separate tubes
   const legProfile = (t) => {
-    if (t < 0.10) return 0.070 + t * 0.120;
-    if (t < 0.42) return 0.0820 - (t - 0.10) * 0.040;
-    if (t < 0.58) return 0.0690 - (t - 0.42) * 0.018;
-    if (t < 0.88) return 0.0630 - (t - 0.58) * 0.025;
-    return 0.0555 - (t - 0.88) * 0.055;
+    if (t < 0.10) return 0.078 + t * 0.120;
+    if (t < 0.42) return 0.0900 - (t - 0.10) * 0.040;
+    if (t < 0.58) return 0.0772 - (t - 0.42) * 0.020;
+    if (t < 0.88) return 0.0740 - (t - 0.58) * 0.028;
+    return 0.0656 - (t - 0.88) * 0.070;
   };
 
   function makeLeg(side) {
@@ -1224,7 +1270,7 @@ export function createCharacter(colorIdx, look) {
     sole.castShadow = true; sole.receiveShadow = true;
     foot.add(sole);
     // fur band at the boot top, matching the reference's cuffs
-    add(foot, new THREE.CylinderGeometry(0.078, 0.082, 0.050, 20), m.scarf, [0, 0.125, 0.000]);
+    add(foot, new THREE.CylinderGeometry(0.074, 0.080, 0.036, 20), m.scarf, [0, 0.118, 0.000]);
     return { hip, knee, foot };
   }
   const legR = makeLeg(1);

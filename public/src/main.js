@@ -529,49 +529,225 @@ function buildSwatches() {
 const preview = (() => {
   const canvas = ui.preview;
   if (!canvas) return { refresh() {}, show() {}, hide() {} };
-  let renderer = null, scene = null, camera = null, ch = null;
+  let renderer = null, scene = null, camera = null, ch = null, snowfall = null;
   let raf = 0, last = 0, running = false, clock = 0;
 
   function ensure() {
     if (renderer) return;
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = 1.04;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(31, 1, 0.05, 20);
-    camera.position.set(0, 1.02, 4.05);
-    camera.lookAt(0, 1.02, 0);
+    scene.fog = new THREE.Fog(0xb9cfe2, 14, 34);
 
-    scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a3742, 1.9));
-    const key = new THREE.DirectionalLight(0xfff3e4, 2.5);
-    key.position.set(-1.8, 2.6, 2.6);
+    camera = new THREE.PerspectiveCamera(34, 1, 0.05, 80);
+    camera.position.set(0, 1.02, 3.95);
+    camera.lookAt(0, 0.98, 0);
+
+    // ---- sky: one vertical gradient, warm at the horizon ------------------
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 4;
+    skyCanvas.height = 256;
+    const sctx = skyCanvas.getContext('2d');
+    const grad = sctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0.00, '#071523');
+    grad.addColorStop(0.20, '#153a57');
+    grad.addColorStop(0.34, '#2f6386');
+    grad.addColorStop(0.44, '#6f97b0');
+    grad.addColorStop(0.485, '#e6c6a8');
+    grad.addColorStop(0.505, '#ffd6ad');
+    grad.addColorStop(0.53, '#ffe4c6');
+    grad.addColorStop(0.58, '#d9e6f0');
+    grad.addColorStop(0.72, '#c4d8ea');
+    grad.addColorStop(1.00, '#b9cee2');
+    sctx.fillStyle = grad;
+    sctx.fillRect(0, 0, 4, 256);
+    const skyTex = new THREE.CanvasTexture(skyCanvas);
+    skyTex.colorSpace = THREE.SRGBColorSpace;
+    skyTex.magFilter = THREE.LinearFilter;
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(46, 32, 20),
+      new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, fog: false })
+    ));
+    // low sun haze, so the warm horizon has a source
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = glowCanvas.height = 128;
+    const glctx = glowCanvas.getContext('2d');
+    const glgrad = glctx.createRadialGradient(64, 64, 2, 64, 64, 62);
+    glgrad.addColorStop(0, 'rgba(255,214,170,0.85)');
+    glgrad.addColorStop(0.35, 'rgba(255,196,150,0.35)');
+    glgrad.addColorStop(1, 'rgba(255,190,140,0)');
+    glctx.fillStyle = glgrad;
+    glctx.fillRect(0, 0, 128, 128);
+    const glowTex = new THREE.CanvasTexture(glowCanvas);
+    const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.7
+    }));
+    sunGlow.scale.set(12, 7, 1);
+    sunGlow.position.set(-3.6, 2.6, -28);
+    scene.add(sunGlow);
+
+    // ---- snow field -------------------------------------------------------
+    const groundCanvas = document.createElement('canvas');
+    groundCanvas.width = groundCanvas.height = 256;
+    const gctx = groundCanvas.getContext('2d');
+    gctx.fillStyle = '#e7eef7';
+    gctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 900; i++) {
+      const x = Math.random() * 256, y = Math.random() * 256;
+      const r = 1 + Math.random() * 7;
+      gctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.20)' : 'rgba(176,196,216,0.10)';
+      gctx.beginPath();
+      gctx.arc(x, y, r, 0, Math.PI * 2);
+      gctx.fill();
+    }
+    const groundTex = new THREE.CanvasTexture(groundCanvas);
+    groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+    groundTex.repeat.set(9, 9);
+    groundTex.colorSpace = THREE.SRGBColorSpace;
+    const snowMat = new THREE.MeshStandardMaterial({ map: groundTex, color: 0xffffff, roughness: 0.94, metalness: 0 });
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(34, 72), snowMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // soft drifts so the horizon is not a ruler line
+    for (let i = 0; i < 9; i++) {
+      const dune = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), snowMat);
+      const side = i % 2 ? 1 : -1;
+      dune.scale.set(2.2 + Math.random() * 3.2, 0.18 + Math.random() * 0.14, 1.4 + Math.random() * 2.0);
+      dune.position.set(side * (3.2 + Math.random() * 7), -0.10, -2.4 - Math.random() * 7);
+      dune.receiveShadow = true;
+      scene.add(dune);
+    }
+
+    // ---- mountains: two flat-shaded layers --------------------------------
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x47698c, roughness: 1, metalness: 0, flatShading: true });
+    const farRockMat = new THREE.MeshStandardMaterial({ color: 0x6d89a6, roughness: 1, metalness: 0, flatShading: true });
+    const capMat = new THREE.MeshStandardMaterial({ color: 0xdfeaf6, roughness: 0.9, metalness: 0 });
+    const mountain = (x, z, h, r, sides, mat, squash) => {
+      const group = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.ConeGeometry(r, h, sides), mat);
+      body.position.y = h / 2 - 0.4;
+      body.scale.x = squash;
+      group.add(body);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.30, h * 0.26, sides), capMat);
+      cap.position.y = h * 0.74 + h * 0.13 - 0.4;
+      cap.scale.x = squash;
+      group.add(cap);
+      group.position.set(x, 0, z);
+      group.rotation.y = Math.random() * Math.PI;
+      scene.add(group);
+    };
+    // leave the centre open: the character's silhouette needs clean sky
+    for (let i = 0; i < 8; i++) {
+      const side = i % 2 ? 1 : -1;
+      mountain(side * (6.5 + Math.floor(i / 2) * 5.4 + Math.random() * 2.4), -21 - Math.random() * 5,
+        3.6 + Math.random() * 2.6, 2.4 + Math.random() * 1.6, 6 + (i % 3), farRockMat, 0.9 + Math.random() * 0.5);
+    }
+    for (let i = 0; i < 6; i++) {
+      const side = i % 2 ? 1 : -1;
+      mountain(side * (4.2 + Math.floor(i / 2) * 4.8 + Math.random() * 1.6), -14.5 - Math.random() * 2.5,
+        1.9 + Math.random() * 1.4, 1.5 + Math.random() * 0.9, 5 + (i % 2), rockMat, 0.9 + Math.random() * 0.5);
+    }
+
+    // ---- pines, framing the rider ----------------------------------------
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3e3129, roughness: 1 });
+    const pineMat = new THREE.MeshStandardMaterial({ color: 0x21483a, roughness: 0.96, metalness: 0, flatShading: true });
+    const pineSnowMat = new THREE.MeshStandardMaterial({ color: 0xe9f1fa, roughness: 0.92, metalness: 0 });
+    const pine = (x, z, s) => {
+      const group = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.08 * s, 0.62 * s, 6), trunkMat);
+      trunk.position.y = 0.30 * s;
+      group.add(trunk);
+      for (let i = 0; i < 3; i++) {
+        const r = (0.50 - i * 0.12) * s;
+        const h = (0.60 - i * 0.05) * s;
+        const base = (0.34 + i * 0.31) * s;
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), pineMat);
+        cone.position.y = base + h * 0.5;
+        cone.rotation.y = i * 0.45;
+        group.add(cone);
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.40, h * 0.30, 7), pineSnowMat);
+        cap.position.y = cone.position.y + h * 0.38;
+        cap.rotation.y = cone.rotation.y;
+        group.add(cap);
+      }
+      group.position.set(x, 0, z);
+      scene.add(group);
+    };
+    pine(-3.1, -2.2, 1.25); pine(-4.6, -3.4, 1.7); pine(-6.4, -2.6, 1.1);
+    pine(-5.4, -6.2, 2.0); pine(-8.2, -5.0, 1.5); pine(-2.6, -5.6, 0.9);
+    pine(3.4, -2.8, 1.35); pine(5.2, -4.2, 1.8); pine(7.4, -3.0, 1.15);
+    pine(4.4, -7.0, 2.1); pine(8.6, -6.4, 1.6); pine(2.9, -6.0, 0.95);
+    pine(-11.5, -8.5, 2.2); pine(11.8, -8.0, 2.0);
+
+    // ---- falling snow -----------------------------------------------------
+    const count = 640;
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 20;
+      pos[i * 3 + 1] = Math.random() * 9;
+      pos[i * 3 + 2] = -11 + Math.random() * 14;
+    }
+    const snowGeo = new THREE.BufferGeometry();
+    snowGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const flakeCanvas = document.createElement('canvas');
+    flakeCanvas.width = flakeCanvas.height = 32;
+    const fctx = flakeCanvas.getContext('2d');
+    const fg = fctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    fg.addColorStop(0, 'rgba(255,255,255,1)');
+    fg.addColorStop(0.45, 'rgba(255,255,255,0.7)');
+    fg.addColorStop(1, 'rgba(255,255,255,0)');
+    fctx.fillStyle = fg;
+    fctx.fillRect(0, 0, 32, 32);
+    const flakeTex = new THREE.CanvasTexture(flakeCanvas);
+    snowfall = new THREE.Points(snowGeo, new THREE.PointsMaterial({
+      map: flakeTex, color: 0xffffff, size: 0.05, transparent: true, opacity: 0.78,
+      depthWrite: false, sizeAttenuation: true
+    }));
+    scene.add(snowfall);
+
+    // ---- light: low sun from the left, cold rim from behind ---------------
+    scene.add(new THREE.HemisphereLight(0xbdd8f0, 0x53657a, 1.25));
+    const key = new THREE.DirectionalLight(0xffd9b8, 2.9);
+    key.position.set(-3.8, 7.2, 4.6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.left = -2.4; key.shadow.camera.right = 2.4;
+    key.shadow.camera.top = 3.2; key.shadow.camera.bottom = -1.5;
+    key.shadow.camera.near = 0.5; key.shadow.camera.far = 18;
+    key.shadow.bias = -0.0006;
+    key.shadow.normalBias = 0.02;
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0x9fd2ff, 2.0);
-    rim.position.set(2.4, 1.9, -2.4);
+    const rim = new THREE.DirectionalLight(0x9fd2ff, 3.0);
+    rim.position.set(4.4, 2.8, -5.2);
     scene.add(rim);
-    const fill = new THREE.DirectionalLight(0xffd9c2, 0.9);
-    fill.position.set(2.2, 0.6, 1.8);
+    const fill = new THREE.DirectionalLight(0xffd2b4, 0.55);
+    fill.position.set(2.6, 1.2, 2.4);
     scene.add(fill);
 
-    // soft contact shadow only: no pedestal, no frame, so the character floats
+    // soft contact shadow on top of the real one: keeps the boots planted
     const shadowCanvas = document.createElement('canvas');
     shadowCanvas.width = shadowCanvas.height = 128;
-    const sctx = shadowCanvas.getContext('2d');
-    const grad = sctx.createRadialGradient(64, 64, 4, 64, 64, 62);
-    grad.addColorStop(0, 'rgba(3,10,18,0.55)');
-    grad.addColorStop(0.55, 'rgba(3,10,18,0.24)');
-    grad.addColorStop(1, 'rgba(3,10,18,0)');
-    sctx.fillStyle = grad;
-    sctx.fillRect(0, 0, 128, 128);
+    const shctx = shadowCanvas.getContext('2d');
+    const shgrad = shctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+    shgrad.addColorStop(0, 'rgba(3,10,18,0.42)');
+    shgrad.addColorStop(0.55, 'rgba(3,10,18,0.18)');
+    shgrad.addColorStop(1, 'rgba(3,10,18,0)');
+    shctx.fillStyle = shgrad;
+    shctx.fillRect(0, 0, 128, 128);
     const shadowTex = new THREE.CanvasTexture(shadowCanvas);
     const shadow = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: shadowTex, transparent: true, depthWrite: false, opacity: 0.9
+      map: shadowTex, transparent: true, depthWrite: false, opacity: 0.75
     }));
-    shadow.scale.set(1.55, 0.52, 1);
-    shadow.position.set(0, 0.03, 0);
+    shadow.scale.set(1.35, 0.42, 1);
+    shadow.position.set(0, 0.02, 0);
     scene.add(shadow);
   }
 
@@ -588,7 +764,19 @@ const preview = (() => {
     if (!ch) return;
     // the character owns its root yaw, so the turn goes through update() --
     // that keeps the idle lean and turn smoothing in one place
-    ch.update(dt, { speed: 0, grounded: true, yaw: Math.PI + Math.sin(clock * 0.42) * 0.72 });
+    ch.update(dt, { speed: 0, grounded: true, yaw: Math.PI + 0.18 + Math.sin(clock * 0.22) * 0.14 });
+    if (snowfall) {
+      const p = snowfall.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        let y = p.getY(i) - dt * 0.34;
+        let x = p.getX(i) + dt * 0.12;
+        if (y < 0) { y += 9; x = (Math.random() - 0.5) * 20; }
+        if (x > 10) x -= 20;
+        p.setX(i, x);
+        p.setY(i, y);
+      }
+      p.needsUpdate = true;
+    }
   }
 
   function resize() {
