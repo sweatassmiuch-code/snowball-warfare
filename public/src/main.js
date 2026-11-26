@@ -32,20 +32,29 @@ const ui = {
   perfChip: $('perfChip'), fpsVal: $('fpsVal'), fpsScale: $('fpsScale'),
   preview: $('preview'), lookSummary: $('lookSummary'), randomLook: $('randomLook'),
   fpsToggle: $('fpsToggle'), swJacket: $('swJacket'), swScarf: $('swScarf'),
-  swHat: $('swHat'), swSkin: $('swSkin'), tabs: [...document.querySelectorAll('.menu-v2 .tab')],
-  panes: [...document.querySelectorAll('.menu-v2 .pane')]
+  swHat: $('swHat'), swSkin: $('swSkin'), optionsBtn: $('optionsBtn'),
+  optionsPanel: $('optionsPanel'), optionsClose: $('optionsClose')
 };
 
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
-const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3, showFps: false, look: { j: 0, s: 0, k: 3, h: 0 } };
+const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3, showFps: false, lookVersion: 2, look: { j: 0, s: 0, k: 0, h: 0 } };
 let settings = { ...defaults };
 try {
   settings = { ...defaults, ...JSON.parse(localStorage.getItem('sbw.settings') || '{}') };
 } catch {}
 function saveSettings() {
   try { localStorage.setItem('sbw.settings', JSON.stringify(settings)); } catch {}
+}
+// Palette v2: saved looks point at colours that no longer exist, so reset them
+// once instead of showing a character nobody picked.
+if (settings.lookVersion !== 2) {
+  settings.look = { ...defaults.look };
+  settings.lookVersion = 2;
+  saveSettings();
+} else {
+  settings.look = { ...defaults.look, ...(settings.look || {}) };
 }
 ui.nameInput.value = settings.name;
 ui.sensRange.value = settings.sens;
@@ -55,7 +64,6 @@ ui.botsSel.value = String(settings.bots);
 ui.sensVal.textContent = Number(settings.sens).toFixed(2);
 ui.volVal.textContent = Math.round(settings.vol * 100) + '%';
 ui.perfChip.classList.toggle('hidden', !settings.showFps);
-settings.look = { ...defaults.look, ...(settings.look || {}) };
 ui.fpsToggle.checked = !!settings.showFps;
 
 // ---------------------------------------------------------------------------
@@ -533,9 +541,9 @@ const preview = (() => {
     renderer.toneMappingExposure = 1.12;
 
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(30, 1, 0.05, 20);
-    camera.position.set(0, 1.04, 4.05);
-    camera.lookAt(0, 0.95, 0);
+    camera = new THREE.PerspectiveCamera(31, 1, 0.05, 20);
+    camera.position.set(0, 1.05, 4.35);
+    camera.lookAt(0, 1.05, 0);
 
     scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a3742, 1.9));
     const key = new THREE.DirectionalLight(0xfff3e4, 2.5);
@@ -548,19 +556,23 @@ const preview = (() => {
     fill.position.set(2.2, 0.6, 1.8);
     scene.add(fill);
 
-    const disc = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.52, 0.58, 0.05, 44),
-      new THREE.MeshStandardMaterial({ color: 0x16283a, roughness: 0.55, metalness: 0.1 })
-    );
-    disc.position.y = -0.025;
-    scene.add(disc);
-    const halo = new THREE.Mesh(
-      new THREE.RingGeometry(0.6, 0.66, 48),
-      new THREE.MeshBasicMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
-    );
-    halo.rotation.x = -Math.PI / 2;
-    halo.position.y = 0.002;
-    scene.add(halo);
+    // soft contact shadow only: no pedestal, no frame, so the character floats
+    const shadowCanvas = document.createElement('canvas');
+    shadowCanvas.width = shadowCanvas.height = 128;
+    const sctx = shadowCanvas.getContext('2d');
+    const grad = sctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+    grad.addColorStop(0, 'rgba(3,10,18,0.55)');
+    grad.addColorStop(0.55, 'rgba(3,10,18,0.24)');
+    grad.addColorStop(1, 'rgba(3,10,18,0)');
+    sctx.fillStyle = grad;
+    sctx.fillRect(0, 0, 128, 128);
+    const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+    const shadow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: shadowTex, transparent: true, depthWrite: false, opacity: 0.9
+    }));
+    shadow.scale.set(1.55, 0.52, 1);
+    shadow.position.set(0, 0.03, 0);
+    scene.add(shadow);
   }
 
   function build() {
@@ -576,7 +588,7 @@ const preview = (() => {
     if (!ch) return;
     // the character owns its root yaw, so the turn goes through update() --
     // that keeps the idle lean and turn smoothing in one place
-    ch.update(dt, { speed: 0, grounded: true, yaw: Math.PI + Math.sin(clock * 0.55) * 0.40 });
+    ch.update(dt, { speed: 0, grounded: true, yaw: Math.PI + Math.sin(clock * 0.42) * 0.72 });
   }
 
   function resize() {
@@ -631,14 +643,8 @@ ui.randomLook?.addEventListener('click', () => {
   preview.refresh();
 });
 
-for (const tab of ui.tabs) {
-  tab.addEventListener('click', () => {
-    const name = tab.dataset.tab;
-    for (const t of ui.tabs) t.classList.toggle('is-on', t === tab);
-    for (const pane of ui.panes) pane.classList.toggle('is-on', pane.dataset.pane === name);
-    if (name === 'look') preview.show();
-  });
-}
+ui.optionsBtn?.addEventListener('click', () => ui.optionsPanel.classList.toggle('hidden'));
+ui.optionsClose?.addEventListener('click', () => ui.optionsPanel.classList.add('hidden'));
 
 ui.fpsToggle?.addEventListener('change', () => {
   settings.showFps = ui.fpsToggle.checked;
@@ -1527,13 +1533,13 @@ function updateLocalPlayer(dt, realDt = dt) {
   // The arm sits at a fixed distance from the eye, so a narrow window makes it
   // read as a tree trunk. Scale the pivots with the field of view instead of
   // pushing them back, which would drag the hand into the middle of the screen.
-  const vmScale = THREE.MathUtils.clamp(camera.aspect / 1.62, 0.58, 1.0);
+  const vmScale = THREE.MathUtils.clamp(camera.aspect / 1.62, 0.60, 1.0) * 1.10;
   for (const part of viewmodel.group.children) {
     if (part.scale.x !== vmScale) part.scale.setScalar(vmScale);
   }
   viewmodel.update(realDt, {
     speed, sprinting, charging: G.charge,
-    swayX, swayY, grounded: G.grounded
+    swayX, swayY, grounded: G.grounded, spread: vmScale
   });
   viewmodel.setVisible(!G.dead && G.mode !== 'menu');
   aim.update(realDt, G.charging ? G.charge : 0);

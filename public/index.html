@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>SNOWBALL WARFARE — Ein Treffer. Tot.</title>
-<meta name="description" content="Hyperrealistischer Multiplayer-Schneeballshooter im Schneesturm. Ein Treffer und du bist raus." />
+<meta name="description" content="Cartoon-Multiplayer-Schneeballshooter im Schneesturm. Ein Treffer und du bist raus." />
 <meta name="theme-color" content="#0b1520" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9D%84%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="./styles.css" />
@@ -62,131 +62,108 @@
 </div>
 
 <!-- ===================== START MENU ===================== -->
-<div id="menu" class="fullscreen menu-v2">
+<div id="menu" class="fullscreen menu-v3">
   <div class="menu-bg"></div>
 
-  <div class="menu-shell">
-    <header class="menu-head">
-      <div class="brand-row">
-        <div class="brand-mark">&#10052;</div>
-        <div class="brand-text">
-          <h1>SNOWBALL<span>WARFARE</span></h1>
-          <p class="tagline">Ein Treffer &ndash; und du bist raus.</p>
-        </div>
+  <header class="v3-head">
+    <div class="v3-brand">
+      <span class="v3-mark">&#10052;</span>
+      <div>
+        <h1>SNOWBALL<span>WARFARE</span></h1>
+        <p>Ein Treffer &ndash; und du bist raus.</p>
       </div>
-      <div class="head-meta">
-        <span class="pill"><i class="dot-live"></i> P2P &middot; OHNE ACCOUNT</span>
-        <span class="pill">v1.1</span>
-      </div>
-    </header>
+    </div>
+    <div class="v3-head-right">
+      <span class="v3-pill"><i class="dot-live"></i> P2P &middot; OHNE ACCOUNT</span>
+      <button class="v3-gear" id="optionsBtn" title="Optionen" aria-label="Optionen">&#9881;</button>
+    </div>
+  </header>
 
-    <div class="menu-grid">
-      <section class="panel preview-card">
-        <div class="preview-stage">
-          <canvas id="preview"></canvas>
-          <div class="preview-glow"></div>
-        </div>
-        <div class="preview-foot">
-          <div>
-            <b>DEIN CHARAKTER</b>
-            <small id="lookSummary">Klassisch</small>
-          </div>
-          <button class="mini" id="randomLook">ZUFALL</button>
-        </div>
-      </section>
+  <main class="v3-stage">
+    <div class="v3-glow"></div>
+    <canvas id="preview"></canvas>
+    <div class="v3-caption">
+      <b>DEIN CHARAKTER</b>
+      <small id="lookSummary">Blau &middot; Weiss &middot; Hell</small>
+      <button id="randomLook">ZUFALL</button>
+    </div>
+  </main>
 
-      <section class="panel play-card">
-        <nav class="tabs">
-          <button class="tab is-on" data-tab="deploy">EINSATZ</button>
-          <button class="tab" data-tab="look">CHARAKTER</button>
-          <button class="tab" data-tab="options">OPTIONEN</button>
-        </nav>
+  <aside class="v3-play">
+    <button class="play-btn" id="hostBtn">
+      <span class="play-tri">&#9654;</span>
+      <span class="play-word">PLAY</span>
+      <small>RAUM ERSTELLEN</small>
+    </button>
+    <div id="menuStatus" class="status">Bereit.</div>
+  </aside>
 
-        <div class="pane is-on" data-pane="deploy">
-          <div class="facts">
-            <div><b>15</b><span>ELIMINIERUNGEN</span></div>
-            <div><b>1</b><span>TREFFER = AUS</span></div>
-            <div><b>8</b><span>SPIELER MAX</span></div>
-          </div>
+  <footer class="v3-dock">
+    <label class="v3-field v3-name">
+      <span>DEIN NAME</span>
+      <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
+    </label>
 
-          <label class="field">
-            <span>DEIN NAME</span>
-            <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
-          </label>
-
-          <div class="row2">
-            <label class="field">
-              <span>QUALIT&Auml;T</span>
-              <select id="qualitySel">
-                <option value="high" selected>Hoch</option>
-                <option value="mid">Mittel</option>
-                <option value="low">Niedrig</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>BOTS</span>
-              <select id="botsSel">
-                <option value="0">0</option>
-                <option value="2">2</option>
-                <option value="3" selected>3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-              </select>
-            </label>
-          </div>
-
-          <button class="btn primary" id="hostBtn"><span>RAUM ERSTELLEN</span><small>mit Bots starten</small></button>
-
-          <div class="or"><span>ODER RAUMCODE EINGEBEN</span></div>
-
-          <div class="join-row">
-            <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
-            <button class="btn" id="joinBtn">BEITRETEN</button>
-          </div>
-
-          <div id="menuStatus" class="status">Bereit.</div>
-        </div>
-
-        <div class="pane" data-pane="look">
-          <div class="look-row"><span>JACKE</span><div class="swatches" id="swJacket"></div></div>
-          <div class="look-row"><span>SCHAL</span><div class="swatches" id="swScarf"></div></div>
-          <div class="look-row"><span>M&Uuml;TZE</span><div class="swatches" id="swHat"></div></div>
-          <div class="look-row"><span>HAUT</span><div class="swatches" id="swSkin"></div></div>
-          <p class="small-note">Deine Auswahl wird mit dem Namen an alle im Raum gesendet.</p>
-        </div>
-
-        <div class="pane" data-pane="options">
-          <label class="slider">
-            <span>MAUS-EMPFINDLICHKEIT <b id="sensVal">1.0</b></span>
-            <input id="sensRange" type="range" min="0.3" max="2.6" step="0.05" value="1" />
-          </label>
-          <label class="slider">
-            <span>LAUTST&Auml;RKE <b id="volVal">80%</b></span>
-            <input id="volRange" type="range" min="0" max="1" step="0.05" value="0.8" />
-          </label>
-          <label class="check">
-            <input type="checkbox" id="fpsToggle" />
-            <span>FPS-ANZEIGE EINBLENDEN <kbd>F</kbd></span>
-          </label>
-
-          <div class="controls">
-            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Bewegen</span></div>
-            <div><kbd>SHIFT</kbd><span>Sprinten (Ausdauer)</span></div>
-            <div><kbd>SPACE</kbd><span>Springen</span></div>
-            <div><kbd>MAUS</kbd><span>Zielen</span></div>
-            <div><kbd>LMB</kbd><span>Werfen (halten)</span></div>
-            <div><kbd>TAB</kbd><span>Rangliste</span></div>
-            <div><kbd>M</kbd><span>Ton aus/an</span></div>
-            <div><kbd>ESC</kbd><span>Pause</span></div>
-          </div>
-        </div>
-      </section>
+    <div class="v3-looks">
+      <div class="v3-look"><span>JACKE</span><div class="swatches" id="swJacket"></div></div>
+      <div class="v3-look"><span>KRAGEN</span><div class="swatches" id="swScarf"></div></div>
+      <div class="v3-look"><span>M&Uuml;TZE</span><div class="swatches" id="swHat"></div></div>
+      <div class="v3-look"><span>HAUT</span><div class="swatches" id="swSkin"></div></div>
     </div>
 
-    <footer class="menu-foot">
-      <span>&#10052;</span> SNOWBALL WARFARE <span class="sep">&middot;</span> Peer-to-Peer &uuml;ber WebRTC <span class="sep">&middot;</span> Ein Treffer. Tot.
-    </footer>
-  </div>
+    <div class="v3-field v3-join">
+      <span>RAUMCODE</span>
+      <div class="v3-join-row">
+        <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
+        <button id="joinBtn">BEITRETEN</button>
+      </div>
+    </div>
+  </footer>
+
+  <section class="v3-options hidden" id="optionsPanel">
+    <div class="v3-opt-head">
+      <b>OPTIONEN</b>
+      <button class="v3-gear" id="optionsClose" aria-label="Schliessen">&times;</button>
+    </div>
+    <label class="field">
+      <span>QUALIT&Auml;T</span>
+      <select id="qualitySel">
+        <option value="high" selected>Hoch</option>
+        <option value="mid">Mittel</option>
+        <option value="low">Niedrig</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>BOTS</span>
+      <select id="botsSel">
+        <option value="0">0</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </label>
+    <label class="slider">
+      <span>MAUS-EMPFINDLICHKEIT <b id="sensVal">1.0</b></span>
+      <input id="sensRange" type="range" min="0.3" max="2.6" step="0.05" value="1" />
+    </label>
+    <label class="slider">
+      <span>LAUTST&Auml;RKE <b id="volVal">80%</b></span>
+      <input id="volRange" type="range" min="0" max="1" step="0.05" value="0.8" />
+    </label>
+    <label class="check">
+      <input type="checkbox" id="fpsToggle" />
+      <span>FPS-ANZEIGE <kbd>F</kbd></span>
+    </label>
+    <div class="v3-keys">
+      <div><kbd>WASD</kbd><span>Bewegen</span></div>
+      <div><kbd>SHIFT</kbd><span>Sprinten</span></div>
+      <div><kbd>SPACE</kbd><span>Springen</span></div>
+      <div><kbd>LMB</kbd><span>Werfen</span></div>
+      <div><kbd>TAB</kbd><span>Rangliste</span></div>
+      <div><kbd>ESC</kbd><span>Pause</span></div>
+    </div>
+  </section>
 
   <div id="loading" class="loading hidden">
     <div class="spinner"></div>
