@@ -32,6 +32,13 @@
   src: url("./vendor/fonts/barlow-condensed-700.woff2") format("woff2");
 }
 @font-face {
+  font-family: "Permanent Marker";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./vendor/fonts/permanent-marker-400.woff2") format("woff2");
+}
+@font-face {
   font-family: "Anton";
   font-style: normal;
   font-weight: 400;
@@ -1739,6 +1746,21 @@ input[type="range"]::-moz-range-thumb {
   .c7-tab { font-size: 11px; }
   .c7-layout { grid-template-columns: minmax(0, 1fr) 200px; }
   .c7-nav-right .c7-menu-btn { height: 32px; padding: 0 9px; font-size: 8px; }
+}
+
+/* Permanent Marker is the lobby's display/art face: logo, card headlines,
+   mode name and deploy. Nav, tags, meta, HUD and touch controls keep the
+   condensed faces so they stay crisp. */
+.menu-c7 .c7-wordmark,
+.menu-c7 .c7-card-big,
+.menu-c7 .c7-card-title,
+.menu-c7 .c7-card-news-copy b,
+.menu-c7 .c7-mode-name,
+.menu-c7 .c7-deploy > span {
+  font-family: "Permanent Marker", var(--menu-display);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 /* =========================================================================
