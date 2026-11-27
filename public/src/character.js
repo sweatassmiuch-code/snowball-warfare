@@ -1083,6 +1083,24 @@ const armRadius = (t) => {
   if (t < 0.95) return 0.058 - (t - 0.56) * 0.018;
   return 0.051 - (t - 0.95) / 0.05 * 0.024;
 };
+// The viewer's sleeve profile. The first-person arm uses the same function,
+// so the sleeve and hand in game are literally the lobby character's shapes.
+const sleeveProfile = (t) => {
+  let r;
+  if (t < 0.05) r = 0.036 + (t / 0.05) * 0.040;         // cap inside the shell
+  else if (t < 0.17) r = 0.0760 - (t - 0.05) * 0.0270;   // deltoid puff
+  else if (t < 0.38) r = 0.0728 - (t - 0.17) * 0.0305;   // upper arm
+  else if (t < 0.53) r = 0.0664 - (t - 0.38) * 0.0390;   // elbow crease
+  else if (t < 0.85) r = 0.0606 + (t - 0.53) * 0.0125;   // forearm swell
+  else r = 0.0646 - ((t - 0.85) / 0.15) * 0.0170;        // wrist
+  // Five chunky quilted lobes: wide enough to shade, tight enough to read
+  // as a puffer sleeve. They fade out under the cuff.
+  const ramp = Math.min(1, Math.max(0, (t - 0.10) / 0.07));
+  const fade = Math.min(1, Math.max(0, (1 - t) / 0.12));
+  const w = Math.abs(Math.sin((t - 0.17) * 6.4 * Math.PI));
+  const puffed = Math.pow(w, 0.55);
+  return r + (0.0080 * puffed - 0.0022 * (1 - puffed)) * ramp * fade;
+};
 const legRadius = (t) => {
   if (t < 0.06) return 0.045 + t / 0.06 * 0.060;
   if (t < 0.22) return 0.105 - (t - 0.06) * 0.03;
@@ -1337,22 +1355,6 @@ export function createCharacter(colorIdx, look) {
   // upper arm, elbow crease, forearm, then the white cuff. The old profile was
   // a thin tube whose top half sat inside the jacket, so from the front only
   // the mitten showed and the arm looked like a trick drawing.
-  const armProfile = (t) => {
-    let r;
-    if (t < 0.05) r = 0.036 + (t / 0.05) * 0.040;         // cap inside the shell
-    else if (t < 0.17) r = 0.0760 - (t - 0.05) * 0.0270;   // deltoid puff
-    else if (t < 0.38) r = 0.0728 - (t - 0.17) * 0.0305;   // upper arm
-    else if (t < 0.53) r = 0.0664 - (t - 0.38) * 0.0390;   // elbow crease
-    else if (t < 0.85) r = 0.0606 + (t - 0.53) * 0.0125;   // forearm swell
-    else r = 0.0646 - ((t - 0.85) / 0.15) * 0.0170;        // wrist
-    // Five chunky quilted lobes: wide enough to shade, tight enough to read
-    // as a puffer sleeve. They fade out under the cuff.
-    const ramp = Math.min(1, Math.max(0, (t - 0.10) / 0.07));
-    const fade = Math.min(1, Math.max(0, (1 - t) / 0.12));
-    const w = Math.abs(Math.sin((t - 0.17) * 6.4 * Math.PI));
-    const puffed = Math.pow(w, 0.55);
-    return r + (0.0080 * puffed - 0.0022 * (1 - puffed)) * ramp * fade;
-  };
   function makeArm(side) {
     const shoulder = new THREE.Bone();
     // Pivot at the outer third of the shell and let the sleeve hang slightly
@@ -1366,7 +1368,7 @@ export function createCharacter(colorIdx, look) {
     elbow.position.y = -0.30;
     shoulder.add(elbow);
 
-    const armGeo = limbGeometry(0, 0, 0, 0.30, 0.30, armProfile, { rings: 48, radial: 20, blend: 0.075 });
+    const armGeo = limbGeometry(0, 0, 0, 0.30, 0.30, sleeveProfile, { rings: 48, radial: 20, blend: 0.075 });
     const arm = new THREE.SkinnedMesh(armGeo, m.jacket);
     arm.castShadow = true; arm.receiveShadow = true;
     shoulder.add(arm);
@@ -1769,13 +1771,6 @@ export function createViewModel(look) {
   const m = materialsFor(0, look);
   const sleeve = m.jacket;
   const trim = m.scarf;
-  // the first-person glove gets its own, slightly lighter material: a black
-  // shape against snow and sky has no readable form at all
-  const glove = m.mitten.clone();
-  glove.color = new THREE.Color(0x282c35);
-  glove.roughness = 0.68;
-  glove.sheen = 0.4;
-  glove.sheenColor = new THREE.Color(0x8b95a8);
   const snowMat = new THREE.MeshStandardMaterial({
     color: 0xe9f1fb, roughness: 0.95, metalness: 0, envMapIntensity: 0.35,
     normalMap: snowNormal(), normalScale: new THREE.Vector2(0.9, 0.9)
@@ -1791,63 +1786,47 @@ export function createViewModel(look) {
   armPivot.rotation.set(0.05, -0.06, 0.30);
   group.add(armPivot);
 
-  // sleeve: a tapered tube so the wrist is narrower than the arm
-  const forearm = add(armPivot, loftGeometry([
-    [-0.360, 0.070, 0.070], [-0.270, 0.068, 0.068], [-0.180, 0.065, 0.065],
-    [-0.090, 0.061, 0.061], [-0.020, 0.058, 0.058]
-  ], 20), sleeve, [0, 0, 0]);
-  forearm.castShadow = false;
+  // The lobby arm, copied 1:1: same quilted skinned sleeve, same ribbed cuff,
+  // same two-capsule mitten and thumb. It is turned upside down so the hand
+  // sits at the viewmodel wrist while the shoulder runs off the bottom edge.
+  const armRoot = new THREE.Group();
+  armRoot.position.set(0, -0.386, 0);
+  armRoot.rotation.x = Math.PI;
+  armPivot.add(armRoot);
 
-  // white knit cuff, slightly flared at the top
-  const cuff = add(armPivot, new THREE.CylinderGeometry(0.070, 0.064, 0.090, 22), trim, [0, 0.030, 0]);
-  cuff.castShadow = false;
-  // rounded knit lip where the cuff meets the glove, instead of a hard cut
-  add(armPivot, new THREE.TorusGeometry(0.064, 0.0055, 8, 26), trim, [0, 0.075, 0], [Math.PI / 2, 0, 0]);
+  const shoulder = new THREE.Bone();
+  armRoot.add(shoulder);
+  const elbow = new THREE.Bone();
+  elbow.position.y = -0.30;
+  shoulder.add(elbow);
 
-  // mitten: one moulded glove. The palm swells at the knuckles and the finger
-  // side curls forward as it rises, so it cradles the ball from below instead
-  // of wearing it like a hat. Four finger sausages on top read as a claw; one
-  // clean mitten mass plus a thumb reads as a hand.
-  const mitten = add(armPivot, ringLoft([
-    [0.046, 0.000, 0.050, 0.046], [0.072, -0.002, 0.062, 0.055],
-    [0.102, -0.006, 0.074, 0.063], [0.132, -0.010, 0.082, 0.067],
-    [0.162, -0.014, 0.085, 0.068], [0.190, -0.020, 0.082, 0.065],
-    [0.212, -0.026, 0.074, 0.058], [0.226, -0.030, 0.060, 0.046],
-    [0.234, -0.034, 0.040, 0.030], [0.238, -0.036, 0.018, 0.014]
-  ], 26), glove, [0, 0, 0]);
-  mitten.castShadow = false;
+  const armGeo = limbGeometry(0, 0, 0, 0.30, 0.30, sleeveProfile,
+    { rings: 48, radial: 20, blend: 0.075 });
+  const armMesh = new THREE.SkinnedMesh(armGeo, sleeve);
+  armMesh.castShadow = false;
+  shoulder.add(armMesh);
+  armRoot.updateMatrixWorld(true);
+  armMesh.bind(new THREE.Skeleton([shoulder, elbow]), armMesh.matrixWorld.clone());
 
-  // fingers: one smooth mitten band curled across the ball's lower front,
-  // with a soft swell in the middle and rounded ends. Three sharp knuckle
-  // waves read as cracks at this angle; one calm band reads as a closed hand.
-  const fingerCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0.064, 0.286, -0.012),
-    new THREE.Vector3(0.048, 0.276, 0.026),
-    new THREE.Vector3(0.014, 0.272, 0.044),
-    new THREE.Vector3(-0.026, 0.277, 0.038),
-    new THREE.Vector3(-0.054, 0.287, 0.012)
-  ]);
-  const fingers = add(armPivot,
-    taperedTube(fingerCurve, (t) => 0.0210 + 0.0012 * Math.sin(t * Math.PI), 28, 18),
-    glove, [0, 0, 0]);
-  fingers.castShadow = false;
-  for (const t of [0, 1]) {
-    const p = fingerCurve.getPoint(t);
-    add(armPivot, new THREE.SphereGeometry(0.0192, 14, 10), glove, [p.x, p.y, p.z]);
-  }
+  // Padded deltoid over the open top of the sleeve (off-screen, but it keeps
+  // the sleeve closed when the arm swings).
+  add(shoulder, new THREE.SphereGeometry(1, 22, 16), sleeve,
+    [0.004, -0.055, 0], [0, 0, -0.08], [0.079, 0.087, 0.076]);
 
-  // thumb: rises from the palm's near side and closes the grip at the fingers
-  const thumbCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.060, 0.196, 0.018),
-    new THREE.Vector3(-0.082, 0.226, 0.040),
-    new THREE.Vector3(-0.078, 0.262, 0.044),
-    new THREE.Vector3(-0.056, 0.286, 0.020)
-  ]);
-  const thumb = add(armPivot, new THREE.TubeGeometry(thumbCurve, 24, 0.0205, 18, false), glove, [0, 0, 0]);
-  thumb.castShadow = false;
-  for (const p of [thumbCurve.points[0], thumbCurve.points[3]]) {
-    add(armPivot, new THREE.SphereGeometry(0.0205, 14, 10), glove, [p.x, p.y, p.z]);
-  }
+  // wide knit cuff with the same two rolled lips as the lobby character
+  add(elbow, new THREE.CylinderGeometry(0.0655, 0.0690, 0.064, 22), trim, [0, -0.272, 0]);
+  add(elbow, new THREE.TorusGeometry(0.0658, 0.0048, 8, 24), trim,
+    [0, -0.240, 0], [Math.PI / 2, 0, 0]);
+  add(elbow, new THREE.TorusGeometry(0.0692, 0.0046, 8, 24), trim,
+    [0, -0.304, 0], [Math.PI / 2, 0, 0]);
+
+  const hand = new THREE.Group();
+  hand.position.y = -0.296;
+  elbow.add(hand);
+  add(hand, new THREE.CapsuleGeometry(0.056, 0.056, 10, 24), m.mitten,
+    [0, -0.056, -0.006], [0.06, 0, 0], [1.03, 1.04, 0.92]);
+  add(hand, new THREE.CapsuleGeometry(0.024, 0.044, 8, 18), m.mitten,
+    [-0.040, -0.050, -0.014], [0.32, 0, 0.95], [1, 1, 0.96]);
 
   // snowball: a lumpy packed lump of snow sitting in the curl of the mitten,
   // not a white billiard ball with croutons stuck to it
