@@ -22,19 +22,26 @@ const isTypingTarget = (el) => el instanceof Element &&
 // touch layout itself waits for a real finger
 const touchCapable = (navigator.maxTouchPoints || 0) > 0 ||
   (window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false);
+// A handheld is a coarse-pointer touch device. It gets the landscape gate
+// immediately, not only after the first finger touch.
+const coarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
+const handheld = coarsePointer && (navigator.maxTouchPoints || 0) > 0;
 // Every start is desktop, on every device. The touch layout appears only when
 // a finger really touches the screen, so nobody boots into a joystick.
 let isTouch = false;
 document.body.classList.toggle('is-touch', isTouch);
+document.body.classList.toggle('touch-device', handheld);
 const hasMouse = () => document.pointerLockElement === canvas || (DEBUG && !!window.__sbw?.forceInput);
 
 function syncOrientation() {
-  document.body.classList.toggle('portrait', isTouch && window.innerHeight > window.innerWidth);
+  document.body.classList.toggle('portrait', handheld && window.innerHeight > window.innerWidth);
 }
 syncOrientation();
 window.addEventListener('resize', syncOrientation);
 window.addEventListener('orientationchange', () => setTimeout(syncOrientation, 140));
 document.addEventListener('fullscreenchange', syncOrientation);
+window.visualViewport?.addEventListener('resize', syncOrientation);
+if (screen.orientation?.addEventListener) screen.orientation.addEventListener('change', syncOrientation);
 
 async function goImmersive() {
   try {
@@ -47,6 +54,24 @@ async function goImmersive() {
   } catch {}
   syncOrientation();
 }
+
+// Browsers only rotate a page inside fullscreen, and only after a gesture.
+// Try once on load (works in an installed fullscreen PWA) and once on the
+// first tap; if the browser refuses, the portrait gate keeps the game locked
+// until the phone is turned.
+let gestureTried = false;
+function tryHandheldLandscape() {
+  if (gestureTried || !handheld) return;
+  gestureTried = true;
+  if (window.innerHeight > window.innerWidth) goImmersive();
+}
+window.addEventListener('pointerdown', tryHandheldLandscape, { once: true });
+window.addEventListener('touchend', tryHandheldLandscape, { once: true });
+// best effort only: no user gesture, so most browsers will refuse. It must
+// not consume the first-tap attempt below.
+setTimeout(() => {
+  if (handheld && window.innerHeight > window.innerWidth) goImmersive();
+}, 600);
 const ui = {
   hud: $('hud'), menu: $('menu'), loading: $('loading'), loadingText: $('loadingText'),
   nameInput: $('nameInput'), hostBtn: $('hostBtn'), joinBtn: $('joinBtn'), joinCode: $('joinCode'),

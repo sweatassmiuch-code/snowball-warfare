@@ -1914,7 +1914,12 @@ input[type="range"]::-moz-range-thumb {
   background: radial-gradient(80% 70% at 50% 40%, #12303d, #06141c 80%);
   color: #f3f5ef;
 }
-body.is-touch.portrait #rotate { display: flex; }
+body.touch-device.portrait #rotate { display: flex; }
+/* before the module has run, the media query already keeps phones out of the
+   game in portrait instead of flashing the menu for a moment */
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate { display: flex; }
+}
 .rotate-phone {
   position: relative; width: 58px; height: 100px;
   border: 2px solid var(--orange); border-radius: 12px;

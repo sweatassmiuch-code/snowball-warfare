@@ -1,0 +1,11 @@
+{
+  "name": "Snowball Warfare",
+  "short_name": "Snowball",
+  "description": "Ein Treffer. Tot.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#102b35",
+  "theme_color": "#102b35"
+}
