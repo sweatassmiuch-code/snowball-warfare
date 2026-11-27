@@ -810,6 +810,7 @@ function materialsFor(idx, look) {
     }),
     // white rubber sole, also reused for the zip slider and the badges
     sole: new THREE.MeshStandardMaterial({ color: 0xf1f5fa, roughness: 0.72, metalness: 0 }),
+    rubber: new THREE.MeshStandardMaterial({ color: 0x171e27, roughness: 0.9, metalness: 0 }),
     logo: new THREE.MeshStandardMaterial({
       color: 0xf8fafd, roughness: 0.44, metalness: 0, envMapIntensity: 0.8, side: THREE.DoubleSide
     }),
@@ -1401,21 +1402,21 @@ export function createCharacter(colorIdx, look) {
   // ---- legs -------------------------------------------------------------
   // A boot sole as a real extruded footprint: flat on the snow, rounded edges
   // and a little wider than the upper. The old ring read as a white stripe.
-  function soleGeometry() {
+  function soleGeometry(depth = 0.026, bevel = 0.008) {
     const s = new THREE.Shape();
-    const hw = 0.086;
-    s.moveTo(-hw * 0.70, 0.072);
-    s.quadraticCurveTo(-hw, 0.066, -hw, 0.020);
-    s.quadraticCurveTo(-hw - 0.002, -0.028, -hw * 0.92, -0.070);
-    s.quadraticCurveTo(-0.070, -0.140, -0.052, -0.170);
-    s.quadraticCurveTo(0, -0.196, 0.052, -0.170);
-    s.quadraticCurveTo(0.070, -0.140, hw * 0.92, -0.070);
-    s.quadraticCurveTo(hw + 0.002, -0.028, hw, 0.020);
-    s.quadraticCurveTo(hw, 0.066, hw * 0.70, 0.072);
-    s.quadraticCurveTo(0, 0.082, -hw * 0.70, 0.072);
+    const hw = 0.082;
+    s.moveTo(-hw * 0.72, 0.070);
+    s.quadraticCurveTo(-hw, 0.062, -hw, 0.016);
+    s.quadraticCurveTo(-hw - 0.001, -0.030, -hw * 0.92, -0.072);
+    s.quadraticCurveTo(-0.066, -0.138, -0.050, -0.166);
+    s.quadraticCurveTo(0, -0.190, 0.050, -0.166);
+    s.quadraticCurveTo(0.066, -0.138, hw * 0.92, -0.072);
+    s.quadraticCurveTo(hw + 0.001, -0.030, hw, 0.016);
+    s.quadraticCurveTo(hw, 0.062, hw * 0.72, 0.070);
+    s.quadraticCurveTo(0, 0.080, -hw * 0.72, 0.070);
     const geo = new THREE.ExtrudeGeometry(s, {
-      depth: 0.032, bevelEnabled: true, bevelThickness: 0.010,
-      bevelSize: 0.008, bevelSegments: 3, curveSegments: 12
+      depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel,
+      bevelSegments: 3, curveSegments: 14
     });
     geo.rotateX(Math.PI / 2);
     geo.computeVertexNormals();
@@ -1448,33 +1449,56 @@ export function createCharacter(colorIdx, look) {
     root.updateMatrixWorld(true);
     legMesh.bind(new THREE.Skeleton([hip, knee]), legMesh.matrixWorld.clone());
 
-    // Reference sneaker: navy upper, light steel-blue toe box, chunky white
-    // sole and a white sock cuff that peeks out under the baggy trouser leg.
+    // Winter sneaker: high navy shaft, a light steel-blue toe box and tongue,
+    // white laces, a padded white cuff and a two-layer sole. The old boot was
+    // one bulbous loft on a flat white slab, with a sock band for an ankle.
     const foot = new THREE.Group();
     foot.position.y = -0.300;
     knee.add(foot);
     const bootRings = [
-      [0.140, 0.000, 0.064, 0.062], [0.100, 0.000, 0.069, 0.067],
-      [0.060, 0.000, 0.075, 0.074], [0.020, -0.004, 0.079, 0.080],
-      [-0.012, -0.010, 0.081, 0.089], [-0.040, -0.026, 0.081, 0.099],
-      [-0.066, -0.050, 0.078, 0.107], [-0.088, -0.076, 0.071, 0.107],
-      [-0.102, -0.098, 0.058, 0.092], [-0.110, -0.108, 0.042, 0.070]
+      [0.132, 0.000, 0.062, 0.060], [0.108, 0.000, 0.066, 0.064],
+      [0.080, 0.000, 0.071, 0.070], [0.048, -0.002, 0.075, 0.077],
+      [0.014, -0.008, 0.078, 0.085], [-0.020, -0.018, 0.080, 0.093],
+      [-0.048, -0.034, 0.079, 0.100], [-0.072, -0.054, 0.075, 0.102],
+      [-0.092, -0.076, 0.067, 0.096], [-0.105, -0.094, 0.055, 0.084],
+      [-0.112, -0.106, 0.040, 0.062]
     ];
-    const boot = new THREE.Mesh(ringLoft(bootRings, 24), m.boot);
+    const boot = new THREE.Mesh(ringLoft(bootRings, 26), m.boot);
     boot.castShadow = true; boot.receiveShadow = true;
     foot.add(boot);
-    // light-blue toe cap, a shell that wraps the front of the upper
+
+    // light-blue toe box: smaller than the old shell, so the navy upper reads
     add(foot, ringLoftArc([
-      [-0.020, -0.016, 0.0825, 0.1015], [-0.040, -0.026, 0.0835, 0.1015],
-      [-0.066, -0.050, 0.0805, 0.1095], [-0.088, -0.076, 0.0735, 0.1095],
-      [-0.102, -0.098, 0.0605, 0.0945], [-0.110, -0.108, 0.0445, 0.0725]
-    ], 18, -Math.PI / 2 - 1.15, -Math.PI / 2 + 1.15), m.bootToe, [0, 0, 0]);
-    const sole = new THREE.Mesh(soleGeometry(), m.sole);
-    sole.position.y = -0.115;
-    sole.castShadow = true; sole.receiveShadow = true;
-    foot.add(sole);
-    // white sock band between the trouser hem and the shoe collar
-    add(foot, new THREE.CylinderGeometry(0.0745, 0.0795, 0.050, 22), m.scarf, [0, 0.112, 0.000]);
+      [-0.026, -0.020, 0.0808, 0.0945], [-0.048, -0.034, 0.0800, 0.1010],
+      [-0.072, -0.054, 0.0760, 0.1030], [-0.092, -0.076, 0.0680, 0.0970],
+      [-0.105, -0.094, 0.0560, 0.0850], [-0.112, -0.106, 0.0410, 0.0630]
+    ], 22, -Math.PI / 2 - 1.02, -Math.PI / 2 + 1.02), m.bootToe, [0, 0, 0]);
+
+    // padded white cuff with a rounded lip instead of the old flat sock band
+    add(foot, new THREE.CylinderGeometry(0.083, 0.079, 0.055, 26), m.scarf, [0, 0.145, 0.000]);
+    add(foot, new THREE.TorusGeometry(0.078, 0.0125, 8, 26), m.scarf,
+      [0, 0.172, 0.000], [Math.PI / 2, 0, 0]);
+    add(foot, new THREE.TorusGeometry(0.080, 0.0075, 8, 26), m.scarf,
+      [0, 0.118, 0.000], [Math.PI / 2, 0, 0]);
+
+    // tongue and laces give the shoe a real front instead of a smooth blob
+    add(foot, new THREE.CapsuleGeometry(0.030, 0.052, 4, 12), m.bootToe,
+      [0, 0.095, -0.082], [-0.12, 0, 0], [1.15, 1.0, 0.38]);
+    for (let i = 0; i < 3; i++) {
+      add(foot, new THREE.CylinderGeometry(0.0034, 0.0034, 0.052, 7), m.scarf,
+        [0, 0.112 - i * 0.027, -0.094], [0, 0, Math.PI / 2]);
+    }
+
+    // white midsole over a dark rubber outsole
+    const midsole = new THREE.Mesh(soleGeometry(0.026, 0.008), m.sole);
+    midsole.position.y = -0.108;
+    midsole.castShadow = true; midsole.receiveShadow = true;
+    foot.add(midsole);
+    const outsole = new THREE.Mesh(soleGeometry(0.010, 0.003), m.rubber);
+    outsole.position.y = -0.142;
+    outsole.scale.set(0.985, 1, 0.985);
+    outsole.castShadow = true; outsole.receiveShadow = true;
+    foot.add(outsole);
     return { hip, knee, foot };
   }
   const legR = makeLeg(1);
