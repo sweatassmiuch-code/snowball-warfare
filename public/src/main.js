@@ -55,23 +55,22 @@ async function goImmersive() {
   syncOrientation();
 }
 
-// Browsers only rotate a page inside fullscreen, and only after a gesture.
-// Try once on load (works in an installed fullscreen PWA) and once on the
-// first tap; if the browser refuses, the portrait gate keeps the game locked
-// until the phone is turned.
+// Fullscreen on a handheld: browsers may only enter fullscreen straight after
+// a gesture, so ask right away on load (an installed PWA and some Android
+// builds allow that) and again on the very first tap or key, portrait or
+// landscape. Leaving fullscreen with the FULLSCREEN button is respected.
 let gestureTried = false;
-function tryHandheldLandscape() {
-  if (gestureTried || !handheld) return;
+let fullscreenOptOut = false;
+async function tryHandheldFullscreen() {
+  if (gestureTried || fullscreenOptOut || !handheld || document.fullscreenElement) return;
   gestureTried = true;
-  if (window.innerHeight > window.innerWidth) goImmersive();
+  await goImmersive();
 }
-window.addEventListener('pointerdown', tryHandheldLandscape, { once: true });
-window.addEventListener('touchend', tryHandheldLandscape, { once: true });
-// best effort only: no user gesture, so most browsers will refuse. It must
-// not consume the first-tap attempt below.
-setTimeout(() => {
-  if (handheld && window.innerHeight > window.innerWidth) goImmersive();
-}, 600);
+window.addEventListener('click', tryHandheldFullscreen);
+window.addEventListener('keydown', tryHandheldFullscreen);
+// best effort only: no gesture yet, so most browsers refuse and the first tap
+// above does the real work. It must not consume that attempt.
+if (handheld) goImmersive();
 const ui = {
   hud: $('hud'), menu: $('menu'), loading: $('loading'), loadingText: $('loadingText'),
   nameInput: $('nameInput'), hostBtn: $('hostBtn'), joinBtn: $('joinBtn'), joinCode: $('joinCode'),
@@ -1096,8 +1095,14 @@ ui.joinToggle?.addEventListener('click', () => {
 });
 ui.eventPlay?.addEventListener('click', () => ui.hostBtn.click());
 ui.fullscreenBtn?.addEventListener('click', async () => {
-  if (document.fullscreenElement) document.exitFullscreen?.();
-  else await goImmersive();
+  if (document.fullscreenElement) {
+    fullscreenOptOut = true;
+    document.exitFullscreen?.();
+  } else {
+    fullscreenOptOut = false;
+    gestureTried = true;
+    await goImmersive();
+  }
 });
 ui.rotateGo?.addEventListener('click', async () => { await goImmersive(); syncOrientation(); });
 ui.nameInput?.addEventListener('keydown', (e) => {

@@ -11,6 +11,26 @@ export function createAudio() {
   let windStarted = false;
   let noiseBuffer = null;
   let brownBuffer = null;
+  let musicIn = null;
+  let musicGain = null;
+  let musicStarted = false;
+  let musicStep = 0;
+  let musicNext = 0;
+  let musicTimer = null;
+
+  // A slow, cold little loop — Am7, Fmaj7, Cmaj7, G6 at 92 BPM. It starts in
+  // the menu and keeps running through the match, so there is no gap between
+  // lobby and game. Everything is synthesized, nothing to download.
+  const MUSIC_BPM = 92;
+  const MUSIC_STEP = 60 / MUSIC_BPM / 2; // an eighth note
+  const MUSIC_BARS = [
+    { root: 45, notes: [57, 60, 64, 67] },
+    { root: 41, notes: [53, 57, 60, 64] },
+    { root: 48, notes: [48, 52, 55, 59] },
+    { root: 43, notes: [55, 59, 62, 64] }
+  ];
+  const MUSIC_ARP = [0, 2, 1, 3, 2, 1, 3, 2];
+  const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
 
   function makeNoiseBuffer(seconds, brown) {
     const len = Math.floor(ctx.sampleRate * seconds);
@@ -59,6 +79,7 @@ export function createAudio() {
     brownBuffer = makeNoiseBuffer(4, true);
 
     startWind();
+    startMusic();
   }
 
   function startWind() {
@@ -178,6 +199,183 @@ export function createAudio() {
     const rightX = Math.cos(yaw), rightZ = -Math.sin(yaw);
     const pan = dist > 0.5 ? Math.max(-1, Math.min(1, (dx * rightX + dz * rightZ) / dist)) * 0.8 : 0;
     return { vol, pan };
+  }
+
+  // -------------------------------------------------------------------------
+  // Music
+  // -------------------------------------------------------------------------
+  function makeImpulse(seconds, decay) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+  }
+
+  function padVoice(t, chord, dur) {
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(620, t);
+    f.frequency.linearRampToValueAtTime(1400, t + dur * 0.55);
+    f.frequency.linearRampToValueAtTime(700, t + dur);
+    f.Q.value = 0.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1, t + 1.1);
+    g.gain.setTargetAtTime(0.0001, t + dur - 0.45, 0.55);
+    f.connect(g);
+    g.connect(musicIn);
+    chord.notes.forEach((m, i) => {
+      const o = ctx.createOscillator();
+      o.type = i ? 'sawtooth' : 'triangle';
+      o.frequency.value = hz(m);
+      o.detune.value = (i - 1.5) * 7;
+      const og = ctx.createGain();
+      og.gain.value = i ? 0.035 : 0.055;
+      o.connect(og);
+      og.connect(f);
+      o.start(t);
+      o.stop(t + dur + 1.8);
+    });
+  }
+
+  function bassVoice(t, midi, dur) {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(hz(midi), t);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g);
+    g.connect(musicIn);
+    o.start(t);
+    o.stop(t + dur + 0.1);
+  }
+
+  function pluck(t, midi, gain, pan) {
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 3200;
+    f.Q.value = 0.4;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    [["triangle", midi, 1], ["sine", midi + 12, 0.45]].forEach(([type, m, k]) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = hz(m);
+      const og = ctx.createGain();
+      og.gain.value = k;
+      o.connect(og);
+      og.connect(f);
+      o.start(t);
+      o.stop(t + 0.6);
+    });
+    f.connect(g);
+    g.connect(p);
+    p.connect(musicIn);
+  }
+
+  function shaker(t, gain, pan) {
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer;
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 6800;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    src.connect(f);
+    f.connect(g);
+    g.connect(p);
+    p.connect(musicIn);
+    src.start(t, Math.random() * 1.5);
+    src.stop(t + 0.14);
+  }
+
+  function softKick(t, gain) {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(105, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.22);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(g);
+    g.connect(musicIn);
+    o.start(t);
+    o.stop(t + 0.34);
+  }
+
+  function startMusic() {
+    if (musicStarted || !ctx) return;
+    musicStarted = true;
+
+    musicIn = ctx.createGain();
+    musicIn.gain.value = 1;
+
+    // gentle top end so the loop never fights the snow and the hit sounds
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2600;
+    lp.Q.value = 0.3;
+
+    musicGain = ctx.createGain();
+    musicGain.gain.value = 0.55;
+
+    // small generated hall, keeps the loop behind the wind instead of on top
+    const conv = ctx.createConvolver();
+    conv.buffer = makeImpulse(2.4, 2.8);
+    const send = ctx.createGain();
+    send.gain.value = 0.42;
+
+    musicIn.connect(lp);
+    lp.connect(musicGain);
+    lp.connect(send);
+    send.connect(conv);
+    conv.connect(musicGain);
+    musicGain.connect(master);
+
+    musicNext = ctx.currentTime + 0.2;
+    scheduleMusic();
+    musicTimer = setInterval(scheduleMusic, 50);
+  }
+
+  function scheduleMusic() {
+    if (!ctx || !musicStarted) return;
+    // a suspended tab freezes currentTime; do not queue a pile of notes into it
+    if (ctx.state !== 'running') { musicNext = ctx.currentTime + 0.08; return; }
+    if (musicNext < ctx.currentTime) { musicNext = ctx.currentTime + 0.08; musicStep = 0; }
+    while (musicNext < ctx.currentTime + 0.3) {
+      playMusicStep(musicStep, musicNext);
+      musicStep = (musicStep + 1) % 32;
+      musicNext += MUSIC_STEP;
+    }
+  }
+
+  function playMusicStep(step, t) {
+    const barIndex = Math.floor(step / 8) % MUSIC_BARS.length;
+    const bar = MUSIC_BARS[barIndex];
+    const beat = step % 8;
+    if (beat === 0) {
+      padVoice(t, bar, MUSIC_STEP * 8);
+      bassVoice(t, bar.root, MUSIC_STEP * 7.2);
+      softKick(t, 0.16);
+    } else if (beat === 4) {
+      bassVoice(t, bar.root, MUSIC_STEP * 3.2);
+    }
+    pluck(t, bar.notes[MUSIC_ARP[beat]] + 12, beat === 0 ? 0.13 : 0.085, beat % 2 ? 0.3 : -0.3);
+    if (beat % 2 === 1) shaker(t, 0.05, beat % 4 === 1 ? -0.4 : 0.4);
   }
 
   const audio = {
