@@ -635,6 +635,9 @@ const preview = (() => {
   if (!canvas) return { refresh() {}, show() {}, hide() {} };
   let renderer = null, scene = null, camera = null, ch = null;
   let raf = 0, last = 0, running = false, clock = 0;
+  // The showcase never spins by itself: the visitor drags to turn it and the
+  // angle stays where the mitten let go. A little inertia, no spring-back.
+  let yaw = Math.PI, yawVel = 0, dragging = false, dragX = 0;
 
   function ensure() {
     if (renderer) return;
@@ -642,23 +645,53 @@ const preview = (() => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = 1.06;
+    // real shadows: they carve the sleeve out of the jacket and put the boots
+    // on the snow instead of letting the character float
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(31, 1, 0.05, 20);
     camera.position.set(0, 1.0, 4.3);
     camera.lookAt(0, 0.94, 0);
 
-    scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x2a3742, 1.9));
-    const key = new THREE.DirectionalLight(0xfff3e4, 2.5);
-    key.position.set(-1.8, 2.6, 2.6);
+    scene.add(new THREE.HemisphereLight(0xd6e8ff, 0x22303b, 1.45));
+    const key = new THREE.DirectionalLight(0xfff1dd, 2.9);
+    key.position.set(-2.0, 3.0, 2.5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.left = -1.9;
+    key.shadow.camera.right = 1.9;
+    key.shadow.camera.top = 2.4;
+    key.shadow.camera.bottom = -1.4;
+    key.shadow.camera.near = 0.2;
+    key.shadow.camera.far = 10;
+    key.shadow.bias = -0.0006;
+    key.shadow.normalBias = 0.02;
+    key.shadow.radius = 4;
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0x9fd2ff, 2.0);
+    const rim = new THREE.DirectionalLight(0x9fd2ff, 2.1);
     rim.position.set(2.4, 1.9, -2.4);
     scene.add(rim);
-    const fill = new THREE.DirectionalLight(0xffd9c2, 0.9);
+    const fill = new THREE.DirectionalLight(0xffd9c2, 0.7);
     fill.position.set(2.2, 0.6, 1.8);
     scene.add(fill);
+    // soft frontal fill keeps the sleeve tubes from reading as dark slabs
+    const front = new THREE.DirectionalLight(0xeaf4ff, 0.55);
+    front.position.set(0.5, 1.3, 3.4);
+    scene.add(front);
+
+    // the key light casts a real silhouette onto this invisible catcher; the
+    // sprite below only adds the soft ambient occlusion at the feet
+    const catcher = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.4, 4.4),
+      new THREE.ShadowMaterial({ color: 0x07131c, opacity: 0.38 })
+    );
+    catcher.rotation.x = -Math.PI / 2;
+    catcher.position.y = 0.002;
+    catcher.receiveShadow = true;
+    scene.add(catcher);
 
     // soft contact shadow only: no pedestal, no frame, so the character floats
     const shadowCanvas = document.createElement('canvas');
@@ -672,10 +705,10 @@ const preview = (() => {
     sctx.fillRect(0, 0, 128, 128);
     const shadowTex = new THREE.CanvasTexture(shadowCanvas);
     const shadow = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: shadowTex, transparent: true, depthWrite: false, opacity: 0.9
+      map: shadowTex, transparent: true, depthWrite: false, opacity: 0.55
     }));
-    shadow.scale.set(1.55, 0.52, 1);
-    shadow.position.set(0, 0.03, 0);
+    shadow.scale.set(1.32, 0.42, 1);
+    shadow.position.set(0, 0.012, 0);
     scene.add(shadow);
   }
 
@@ -693,12 +726,44 @@ const preview = (() => {
     if (!ch) return;
     // the character owns its root yaw, so the turn goes through update() --
     // that keeps the idle lean and turn smoothing in one place
-    ch.update(dt, { speed: 0, grounded: true, yaw: Math.PI + Math.sin(clock * 0.42) * 0.72 });
-    // showcase pose: the right hand holds a snowball in front of the hip
-    ch.armR.shoulder.rotation.x = 0.42;
-    ch.armR.shoulder.rotation.z = 0.18;
-    ch.armR.elbow.rotation.x = 0.62;
+    ch.update(dt, { speed: 0, grounded: true, yaw });
+    // relaxed stance: both sleeves hang out beside the jacket and the right
+    // mitten carries the snowball at hip height. The old pose folded the arm
+    // across the belly, which hid the shoulder and looked like an illusion.
+    const sway = Math.sin(clock * 1.3) * 0.012;
+    ch.armR.shoulder.rotation.x = 0.07 + sway;
+    ch.armR.shoulder.rotation.z = 0.145;
+    ch.armR.elbow.rotation.x = 0.14;
+    ch.armL.shoulder.rotation.x = 0.03 - sway;
+    ch.armL.shoulder.rotation.z = -0.135;
+    ch.armL.elbow.rotation.x = 0.10;
   }
+
+  // drag the character to turn it; nothing rotates him on its own
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    dragging = true;
+    dragX = e.clientX;
+    yawVel = 0;
+    canvas.classList.add('is-grabbing');
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - dragX;
+    dragX = e.clientX;
+    yaw += dx * 0.0095;
+    yawVel = dx * 0.30;
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    canvas.classList.remove('is-grabbing');
+    try { if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId); } catch {}
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
 
   function resize() {
     if (!renderer) return;
@@ -716,6 +781,11 @@ const preview = (() => {
     const dt = Math.min(0.05, (t - last) / 1000 || 0.016);
     last = t;
     clock += dt;
+    if (!dragging && yawVel !== 0) {
+      yaw += yawVel * dt;
+      yawVel *= Math.exp(-8 * dt);
+      if (Math.abs(yawVel) < 0.15) yawVel = 0;
+    }
     resize();
     pose(dt);
     renderer.render(scene, camera);

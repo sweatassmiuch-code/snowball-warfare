@@ -1329,53 +1329,64 @@ export function createCharacter(colorIdx, look) {
   // separate tubes with a cap at the elbow, which read as a hard ring and left
   // a gap when it folded. A single tube with a weight blend across the joint
   // bends like cloth.
+  // A sleeve has to read as a sleeve at menu distance: round shoulder puff,
+  // upper arm, elbow crease, forearm, then the white cuff. The old profile was
+  // a thin tube whose top half sat inside the jacket, so from the front only
+  // the mitten showed and the arm looked like a trick drawing.
   const armProfile = (t) => {
     let r;
-    if (t < 0.05) r = 0.029 + (t / 0.05) * 0.054;        // cap tucked in the body
-    else if (t < 0.18) r = 0.0830 - (t - 0.05) * 0.0640;  // deltoid
-    else if (t < 0.44) r = 0.0752 - (t - 0.18) * 0.0330;  // upper sleeve
-    else if (t < 0.56) r = 0.0666 - (t - 0.44) * 0.0080;  // elbow
-    else if (t < 0.88) r = 0.0656 + (t - 0.56) * 0.0020;  // forearm
-    else r = 0.0662 - ((t - 0.88) / 0.12) * 0.0070;       // wrist
-    // same deep puffer channels as the body, six ribs down the sleeve
-    const ramp = Math.min(1, Math.max(0, (t - 0.13) / 0.08));
-    const w = Math.abs(Math.sin((t - 0.16) * 6.5 * Math.PI));
-    const puffed = Math.pow(w, 0.62);
-    return r + (0.0072 * puffed - 0.0020 * (1 - puffed)) * ramp;
+    if (t < 0.05) r = 0.036 + (t / 0.05) * 0.040;         // cap inside the shell
+    else if (t < 0.17) r = 0.0760 - (t - 0.05) * 0.0270;   // deltoid puff
+    else if (t < 0.38) r = 0.0728 - (t - 0.17) * 0.0305;   // upper arm
+    else if (t < 0.53) r = 0.0664 - (t - 0.38) * 0.0390;   // elbow crease
+    else if (t < 0.85) r = 0.0606 + (t - 0.53) * 0.0125;   // forearm swell
+    else r = 0.0646 - ((t - 0.85) / 0.15) * 0.0170;        // wrist
+    // Five chunky quilted lobes: wide enough to shade, tight enough to read
+    // as a puffer sleeve. They fade out under the cuff.
+    const ramp = Math.min(1, Math.max(0, (t - 0.10) / 0.07));
+    const fade = Math.min(1, Math.max(0, (1 - t) / 0.12));
+    const w = Math.abs(Math.sin((t - 0.17) * 6.4 * Math.PI));
+    const puffed = Math.pow(w, 0.55);
+    return r + (0.0080 * puffed - 0.0022 * (1 - puffed)) * ramp * fade;
   };
   function makeArm(side) {
     const shoulder = new THREE.Bone();
-    // The pivot sits at the outer edge of the shell, so the sleeve hangs
-    // beside the jacket instead of being swallowed by it.
-    // The pivot sits low enough that the sleeve's steep top flare stays inside
-    // the jacket shell; the visible sleeve starts where it is already round,
-    // so there is no dark cone in the shoulder crease.
-    shoulder.position.set(side * 0.185, 0.405, 0);
-    shoulder.rotation.z = side * 0.10;
+    // Pivot at the outer third of the shell and let the sleeve hang slightly
+    // away from the body, so the whole arm stays outside the jacket outline
+    // instead of vanishing into it at the chest.
+    shoulder.position.set(side * 0.209, 0.402, 0);
+    shoulder.rotation.z = side * 0.12;
     torsoGroup.add(shoulder);
 
     const elbow = new THREE.Bone();
     elbow.position.y = -0.30;
     shoulder.add(elbow);
 
-    const armGeo = limbGeometry(0, 0, 0, 0.30, 0.30, armProfile, { rings: 30, radial: 18, blend: 0.070 });
+    const armGeo = limbGeometry(0, 0, 0, 0.30, 0.30, armProfile, { rings: 48, radial: 20, blend: 0.075 });
     const arm = new THREE.SkinnedMesh(armGeo, m.jacket);
     arm.castShadow = true; arm.receiveShadow = true;
     shoulder.add(arm);
     root.updateMatrixWorld(true);
     arm.bind(new THREE.Skeleton([shoulder, elbow]), arm.matrixWorld.clone());
 
-    // thick white knit cuff at the wrist, then one soft mitten (palm + thumb)
-    add(elbow, new THREE.CylinderGeometry(0.065, 0.069, 0.058, 20), m.scarf, [0, -0.263, 0]);
-    add(elbow, new THREE.TorusGeometry(0.0665, 0.0048, 8, 22), m.scarf,
-      [0, -0.292, 0], [Math.PI / 2, 0, 0]);
+    // Padded deltoid over the open top of the sleeve: it rounds off the
+    // shoulder and hides the step where the arm leaves the jacket side.
+    add(shoulder, new THREE.SphereGeometry(1, 22, 16), m.jacket,
+      [side * 0.004, -0.055, 0], [0, 0, side * -0.08], [0.079, 0.087, 0.076]);
+
+    // A wide ribbed knit cuff, thicker than the sleeve, then one soft mitten.
+    add(elbow, new THREE.CylinderGeometry(0.0655, 0.0690, 0.064, 22), m.scarf, [0, -0.272, 0]);
+    add(elbow, new THREE.TorusGeometry(0.0658, 0.0048, 8, 24), m.scarf,
+      [0, -0.240, 0], [Math.PI / 2, 0, 0]);
+    add(elbow, new THREE.TorusGeometry(0.0692, 0.0046, 8, 24), m.scarf,
+      [0, -0.304, 0], [Math.PI / 2, 0, 0]);
     const hand = new THREE.Group();
-    hand.position.y = -0.290;
+    hand.position.y = -0.296;
     elbow.add(hand);
-    add(hand, new THREE.CapsuleGeometry(0.056, 0.060, 5, 16), m.mitten,
-      [0, -0.055, -0.004], [0.06, 0, 0], [1.02, 1.05, 0.9]);
+    add(hand, new THREE.CapsuleGeometry(0.054, 0.060, 5, 16), m.mitten,
+      [0, -0.056, -0.006], [0.06, 0, 0], [1.03, 1.04, 0.92]);
     add(hand, new THREE.CapsuleGeometry(0.023, 0.048, 4, 12), m.mitten,
-      [side * -0.044, -0.046, -0.014], [0.30, 0, side * 0.95]);
+      [side * -0.043, -0.048, -0.016], [0.30, 0, side * 0.95]);
     return { shoulder, elbow, hand };
   }
   const armR = makeArm(1);
@@ -1467,13 +1478,14 @@ export function createCharacter(colorIdx, look) {
   const heldBall = new THREE.Group();
   heldBall.visible = false;
   armR.hand.add(heldBall);
-  heldBall.position.set(0, -0.10, -0.02);
-  const ballCore = add(heldBall, new THREE.IcosahedronGeometry(0.092, 2), m.snow, [0, 0, 0]);
+  // the ball sits in front of the mitten instead of swallowing it whole
+  heldBall.position.set(0, -0.106, -0.050);
+  const ballCore = add(heldBall, new THREE.IcosahedronGeometry(0.078, 2), m.snow, [0, 0, 0]);
   ballCore.castShadow = true;
   for (let i = 0; i < 6; i++) {
-    const a = Math.random() * Math.PI * 2, r = 0.055 + Math.random() * 0.04;
-    add(heldBall, new THREE.SphereGeometry(0.022 + Math.random() * 0.016, 6, 5), m.snow,
-      [Math.cos(a) * r, (Math.random() - 0.5) * 0.10, Math.sin(a) * r]);
+    const a = Math.random() * Math.PI * 2, r = 0.050 + Math.random() * 0.034;
+    add(heldBall, new THREE.SphereGeometry(0.019 + Math.random() * 0.014, 6, 5), m.snow,
+      [Math.cos(a) * r, (Math.random() - 0.5) * 0.09, Math.sin(a) * r]);
   }
 
   const state = {
