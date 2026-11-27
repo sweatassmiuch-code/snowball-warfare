@@ -1542,19 +1542,23 @@ function updateStick(e) {
   if (Math.hypot(dx, dy) < 0.16) { dx = 0; dy = 0; }
   G.touchX = dx;
   G.touchY = dy;
-  if (ui.stickKnob) ui.stickKnob.style.transform = `translate(${dx * 33}px, ${dy * 33}px)`;
+  const knob = ui.stickKnob;
+  const travel = Math.max(0, (r.width - (knob?.offsetWidth || 0)) / 2 - 4);
+  if (knob) knob.style.transform = `translate(${dx * travel}px, ${dy * travel}px)`;
 }
 function endStick(e) {
   if (e.pointerId !== stickId) return;
   stickId = null;
   G.touchX = 0;
   G.touchY = 0;
+  ui.stick?.classList.remove('active');
   if (ui.stickKnob) ui.stickKnob.style.transform = '';
 }
 ui.stick?.addEventListener('pointerdown', (e) => {
   if (!isTouch) return;
   e.preventDefault();
   stickId = e.pointerId;
+  ui.stick.classList.add('active');
   try { ui.stick.setPointerCapture(e.pointerId); } catch {}
   updateStick(e);
 });
@@ -1594,6 +1598,7 @@ function setTouchMode(on) {
   G.touchY = 0;
   stickId = null;
   lookId = null;
+  ui.stick?.classList.remove('active');
   if (ui.stickKnob) ui.stickKnob.style.transform = '';
   if (on && document.pointerLockElement) {
     try { document.exitPointerLock(); } catch {}

@@ -1747,30 +1747,86 @@ input[type="range"]::-moz-range-thumb {
 #touchControls { display: none; position: absolute; inset: 0; z-index: 12; pointer-events: none; }
 .is-touch #touchControls { display: block; }
 #stick {
-  position: absolute; left: 20px; bottom: calc(20px + env(safe-area-inset-bottom));
-  width: 112px; height: 112px;
+  position: absolute; left: 22px; bottom: calc(22px + env(safe-area-inset-bottom));
+  width: 150px; height: 150px;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 45%, rgba(12, 35, 46, 0.36), rgba(7, 22, 30, 0.58));
-  border: 1px solid rgba(216, 240, 248, 0.3);
-  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, 0.025);
+  background:
+    radial-gradient(circle at 50% 34%, rgba(126, 196, 220, 0.22), rgba(10, 32, 42, 0.50) 44%, rgba(4, 15, 21, 0.82) 84%);
+  border: 1px solid rgba(214, 242, 252, 0.42);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+    inset 0 12px 26px rgba(150, 215, 240, 0.10),
+    inset 0 -16px 30px rgba(0, 0, 0, 0.34),
+    0 14px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 6px rgba(7, 24, 32, 0.16);
   pointer-events: auto; touch-action: none;
+  user-select: none; -webkit-user-select: none;
+  transition: border-color 0.16s, box-shadow 0.16s;
 }
-#stick::before, #stick::after {
-  content: ""; position: absolute; left: 50%; top: 50%;
-  background: rgba(220, 242, 248, 0.18); transform: translate(-50%, -50%);
-}
-#stick::before { width: 1px; height: 70%; }
-#stick::after { width: 70%; height: 1px; }
-#stick i {
-  position: absolute; left: 50%; top: 50%;
-  width: 46px; height: 46px; margin: -23px 0 0 -23px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #f7fbfd, #cfe4ec);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.34);
+#stick::before {
+  content: ""; position: absolute; inset: 27px; border-radius: 50%;
+  background:
+    linear-gradient(rgba(220, 242, 248, 0.13), rgba(220, 242, 248, 0.13)) center / 1px 100% no-repeat,
+    linear-gradient(90deg, rgba(220, 242, 248, 0.13), rgba(220, 242, 248, 0.13)) center / 100% 1px no-repeat;
   pointer-events: none;
 }
+#stick::after {
+  content: ""; position: absolute; inset: 15px; border-radius: 50%;
+  border: 1px solid rgba(206, 238, 248, 0.12);
+  box-shadow: inset 0 0 20px rgba(120, 190, 220, 0.07);
+  pointer-events: none;
+}
+#stickTicks {
+  position: absolute; inset: 9px; border-radius: 50%;
+  background: repeating-conic-gradient(from -1.4deg,
+    rgba(214, 244, 252, 0.4) 0deg 1.5deg,
+    transparent 1.5deg 15deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 66%, #000 67% 73%, transparent 74%);
+  mask: radial-gradient(circle, transparent 0 66%, #000 67% 73%, transparent 74%);
+  pointer-events: none;
+}
+#stick i {
+  position: absolute; left: 50%; top: 50%;
+  width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 27%, #ffffff 0%, #eaf7fc 24%, #c3dfeb 55%, #86b1c4 82%, #638b9f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 9px 20px rgba(0, 0, 0, 0.42),
+    0 2px 5px rgba(0, 0, 0, 0.28),
+    inset 0 -7px 12px rgba(30, 70, 90, 0.28),
+    inset 0 5px 9px rgba(255, 255, 255, 0.55),
+    0 0 24px rgba(150, 220, 255, 0.18);
+  pointer-events: none;
+  transition: filter 0.16s, box-shadow 0.16s;
+}
+#stick i::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 34%, rgba(255, 255, 255, 0.95), rgba(158, 200, 218, 0.5) 62%, rgba(96, 140, 160, 0.12));
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(20, 50, 65, 0.22);
+}
+#stick.active {
+  border-color: rgba(224, 246, 255, 0.52);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 12px 26px rgba(150, 215, 240, 0.14),
+    inset 0 -16px 30px rgba(0, 0, 0, 0.34),
+    0 14px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 6px rgba(7, 24, 32, 0.16),
+    0 0 30px rgba(120, 205, 240, 0.16);
+}
+#stick.active i {
+  filter: brightness(1.07);
+  box-shadow:
+    0 9px 20px rgba(0, 0, 0, 0.42),
+    0 2px 5px rgba(0, 0, 0, 0.28),
+    inset 0 -7px 12px rgba(30, 70, 90, 0.28),
+    inset 0 5px 9px rgba(255, 255, 255, 0.6),
+    0 0 32px rgba(150, 225, 255, 0.36);
+}
 #touchSide {
-  position: absolute; left: calc(20px + 122px); bottom: calc(22px + env(safe-area-inset-bottom));
+  position: absolute; left: calc(22px + 158px); bottom: calc(24px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; gap: 6px;
   pointer-events: auto;
 }
@@ -1847,9 +1903,13 @@ body.is-touch.portrait #rotate { display: flex; }
   .c7-deploy > span { font-size: 20px; }
   .c7-status { display: none; }
   .c7-join-toggle { margin-top: 4px; }
-  #stick { width: 94px; height: 94px; left: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); }
-  #stick i { width: 40px; height: 40px; margin: -20px 0 0 -20px; }
-  #touchSide { left: calc(14px + 102px); bottom: calc(15px + env(safe-area-inset-bottom)); }
+  #stick { width: 122px; height: 122px; left: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); }
+  #stick::before { inset: 22px; }
+  #stick::after { inset: 12px; }
+  #stickTicks { inset: 7px; }
+  #stick i { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
+  #stick i::after { width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; }
+  #touchSide { left: calc(14px + 130px); bottom: calc(15px + env(safe-area-inset-bottom)); }
   #touchThrow { width: 88px; height: 88px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); }
   #touchThrow b { font-size: 14px; }
 }
