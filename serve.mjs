@@ -42,7 +42,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('\n  ❄  SNOWBALL WARFARE — lokal');
+  console.log('\n  ❄  SNOWBOUND — local');
   console.log(`  →  http://localhost:${PORT}`);
   for (const list of Object.values(os.networkInterfaces())) {
     for (const i of list || []) {

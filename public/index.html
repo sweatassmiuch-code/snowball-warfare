@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
@@ -9,8 +9,8 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>SNOWBALL WARFARE — Ein Treffer. Tot.</title>
-<meta name="description" content="Cartoon-Multiplayer-Schneeballshooter im Schneesturm. Ein Treffer und du bist raus." />
+<title>Snowbound — One Hit. You're Out.</title>
+<meta name="description" content="Cartoon multiplayer snowball shooter in a blizzard. One hit and you're out." />
 <meta name="theme-color" content="#102b35" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9D%84%3C/text%3E%3C/svg%3E" />
 <link rel="preload" as="font" type="font/woff2" href="./vendor/fonts/knewave-400.woff2" crossorigin />
@@ -25,15 +25,15 @@
 <!-- ===================== IN-GAME HUD ===================== -->
 <div id="hud" class="hidden">
   <div id="topbar">
-    <div class="chip room" id="roomChip" title="Klicken zum Kopieren">
-      <span class="label">RAUM</span><b id="roomCode">-----</b>
+    <div class="chip room" id="roomChip" title="Click to copy">
+      <span class="label">ROOM</span><b id="roomCode">-----</b>
     </div>
-    <div class="chip"><span class="dot-live"></span><span id="onlineCount">1</span>&nbsp;SPIELER</div>
+    <div class="chip"><span class="dot-live"></span><span id="onlineCount">1</span>&nbsp;ONLINE</div>
     <div class="chip" id="pingChip"><span id="pingVal">0</span>&nbsp;ms</div>
-    <div class="chip perf hidden" id="perfChip" title="FPS-Anzeige mit F umschalten"><span class="label">FPS</span><b id="fpsVal">–</b><span id="fpsScale" class="tiny">1.00×</span></div>
+    <div class="chip perf hidden" id="perfChip" title="Toggle FPS display with F"><span class="label">FPS</span><b id="fpsVal">–</b><span id="fpsScale" class="tiny">1.00×</span></div>
     <div class="grow"></div>
-    <button class="chip action" id="muteBtn">TON&nbsp;AN</button>
-    <button class="chip action" id="menuBtn">MENÜ</button>
+    <button class="chip action" id="muteBtn">SOUND&nbsp;ON</button>
+    <button class="chip action" id="menuBtn">MENU</button>
   </div>
 
   <div id="killfeed"></div>
@@ -48,26 +48,26 @@
     </div>
     <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
   </div>
-  <div id="chargeLabel">SCHNEEBALL</div>
+  <div id="chargeLabel">SNOWBALL</div>
 
   <div id="bottomBar">
-    <div id="hint">SHIFT SPRINT &middot; CTRL DUCKEN / SLIDE &middot; LMB WERFEN &middot; TAB RANGLISTE</div>
+    <div id="hint">SHIFT SPRINT &middot; CTRL CROUCH / SLIDE &middot; LMB THROW &middot; TAB SCOREBOARD</div>
     <div id="staminaWrap" aria-hidden="true"><i id="staminaFill"></i></div>
-    <div id="stance">1 TREFFER &middot; AUS</div>
+    <div id="stance">1 HIT &middot; OUT</div>
   </div>
 
   <div id="touchControls">
-    <div id="stick" aria-label="Bewegen">
+    <div id="stick" aria-label="Move">
       <span id="stickTicks" aria-hidden="true"></span>
       <i id="stickKnob"></i>
     </div>
     <div id="touchSide">
       <button type="button" id="touchSprint">SPRINT</button>
-      <button type="button" id="touchDuck">DUCKEN</button>
-      <button type="button" id="touchJump">SPRUNG</button>
-      <button type="button" id="touchScore">LISTE</button>
+      <button type="button" id="touchDuck">CROUCH</button>
+      <button type="button" id="touchJump">JUMP</button>
+      <button type="button" id="touchScore">SCORES</button>
     </div>
-    <button type="button" id="touchThrow"><b>WERFEN</b><span>HALTEN &amp; ZIELEN</span></button>
+    <button type="button" id="touchThrow"><b>THROW</b><span>HOLD &amp; AIM</span></button>
   </div>
 
   <div id="toast"></div>
@@ -77,10 +77,10 @@
 <div id="scoreboard" class="overlay-panel hidden">
   <div class="panel score-panel">
     <div class="panel-head">
-      <span>RANGLISTE</span>
-      <span class="tiny">ZIEL: 15 ELIMINIERUNGEN</span>
+      <span>SCOREBOARD</span>
+      <span class="tiny">GOAL: 15 ELIMINATIONS</span>
     </div>
-    <div class="score-head"><span>#</span><span>SPIELER</span><span>K</span><span>T</span></div>
+    <div class="score-head"><span>#</span><span>PLAYER</span><span>K</span><span>D</span></div>
     <div id="scoreRows"></div>
   </div>
 </div>
@@ -91,96 +91,96 @@
   <div class="menu-shade" aria-hidden="true"></div>
 
   <header class="c7-nav">
-    <div class="c7-wordmark"><i>&#10052;</i> SNOWBALL <span>WARFARE</span></div>
-    <nav class="c7-tabs" aria-label="Hauptmenü">
-      <button type="button" class="c7-tab is-on" data-menu-tab="play">SPIELEN</button>
-      <button type="button" class="c7-tab" data-menu-tab="look">LOOK <b>NEU</b></button>
-      <button type="button" class="c7-tab" data-menu-tab="modes">MODUS</button>
-      <button type="button" class="c7-tab" data-menu-tab="options">OPTIONEN</button>
+    <div class="c7-wordmark"><i>&#10052;</i> SNOWBOUND</div>
+    <nav class="c7-tabs" aria-label="Main menu">
+      <button type="button" class="c7-tab is-on" data-menu-tab="play">PLAY</button>
+      <button type="button" class="c7-tab" data-menu-tab="look">LOOK <b>NEW</b></button>
+      <button type="button" class="c7-tab" data-menu-tab="modes">MODES</button>
+      <button type="button" class="c7-tab" data-menu-tab="options">OPTIONS</button>
       <button type="button" class="c7-tab" data-menu-tab="info">INFO</button>
     </nav>
     <div class="c7-nav-right">
-      <span class="c7-players" title="Spieler"><i>&#128101;</i><b>1</b></span>
-      <button type="button" class="c7-menu-btn" id="optionsBtn" aria-haspopup="dialog" aria-controls="optionsPanel">MENÜ <i>&#9776;</i></button>
+      <span class="c7-players" title="Players"><i>&#128101;</i><b>1</b></span>
+      <button type="button" class="c7-menu-btn" id="optionsBtn" aria-haspopup="dialog" aria-controls="optionsPanel">MENU <i>&#9776;</i></button>
     </div>
   </header>
 
   <div class="c7-layout">
-    <aside class="c7-left" aria-label="Saison und Updates">
+    <aside class="c7-left" aria-label="Season and updates">
       <button type="button" class="c7-card c7-card-pass" data-menu-tab="info">
         <span class="c7-card-tag">MISSION</span>
         <span class="c7-card-big">1</span>
-        <span class="c7-card-title">TREFFER</span>
+        <span class="c7-card-title">HIT</span>
         <span class="c7-card-bar"><i></i></span>
-        <span class="c7-card-foot">DANN BIST DU RAUS</span>
+        <span class="c7-card-foot">THEN YOU'RE OUT</span>
       </button>
 
       <button type="button" class="c7-card c7-card-news" id="customizeBtn" aria-haspopup="dialog" aria-controls="customize" aria-expanded="false">
         <span class="c7-card-news-art" aria-hidden="true"></span>
-        <span class="c7-card-tag c7-card-tag-new">NEU</span>
+        <span class="c7-card-tag c7-card-tag-new">NEW</span>
         <span class="c7-card-news-copy">
-          <b>DEIN LOOK</b>
-          <span>SCHUHE &middot; M&Uuml;TZE &middot; JACKE &middot; HANDSCHUHE</span>
-          <span id="lookSummary" class="c7-look-summary">Blau &middot; Weiss &middot; Hell</span>
+          <b>YOUR LOOK</b>
+          <span>SHOES &middot; BEANIE &middot; JACKET &middot; GLOVES</span>
+          <span id="lookSummary" class="c7-look-summary">Blue &middot; White &middot; Light</span>
           <i id="lookDots" class="c7-card-dots" aria-hidden="true"></i>
         </span>
         <i class="c7-card-arrow" aria-hidden="true">&#8594;</i>
       </button>
 
       <button type="button" class="c7-card c7-card-event" id="eventPlay">
-        <span class="c7-card-tag">SAISON 01</span>
-        <span class="c7-card-title">SCHNEEBALL<br />SCHLACHT</span>
-        <span class="c7-card-foot">JETZT SPIELEN <i aria-hidden="true">&#8599;</i></span>
+        <span class="c7-card-tag">SEASON 01</span>
+        <span class="c7-card-title">SNOWBALL<br />SHOWDOWN</span>
+        <span class="c7-card-foot">PLAY NOW <i aria-hidden="true">&#8599;</i></span>
       </button>
     </aside>
 
-    <section class="c7-stage" aria-label="Charakter-Vorschau">
+    <section class="c7-stage" aria-label="Character preview">
       <canvas id="preview"></canvas>
       <div class="c7-player-label">PLAYER</div>
     </section>
 
-    <aside class="c7-right" aria-label="Spielmodus">
+    <aside class="c7-right" aria-label="Game mode">
       <div class="c7-mode">
-        <header class="c7-mode-head"><span>SPIELMODUS</span><i aria-hidden="true">&#8250;</i></header>
+        <header class="c7-mode-head"><span>GAME MODE</span><i aria-hidden="true">&#8250;</i></header>
         <div class="c7-mode-name">SOLO</div>
-        <div class="c7-mode-meta"><span><b>0&ndash;5</b> BOTS</span><span><b>6</b> SPIELER MAX</span></div>
+        <div class="c7-mode-meta"><span><b>0&ndash;5</b> BOTS</span><span><b>6</b> PLAYERS MAX</span></div>
 
         <label class="c7-name">
-          <span>DEIN NAME</span>
-          <input id="nameInput" maxlength="14" placeholder="Gast" autocomplete="off" spellcheck="false" />
+          <span>YOUR NAME</span>
+          <input id="nameInput" maxlength="14" placeholder="Guest" autocomplete="off" spellcheck="false" />
         </label>
 
         <button type="button" class="c7-deploy" id="hostBtn">
-          <span>DEPLOY<small>RAUM ERSTELLEN</small></span>
+          <span>DEPLOY<small>CREATE ROOM</small></span>
           <i aria-hidden="true">&#8599;</i>
         </button>
-        <div id="menuStatus" class="c7-status">Bereit.</div>
+        <div id="menuStatus" class="c7-status">Ready.</div>
 
-        <button type="button" class="c7-join-toggle" id="joinToggle">RAUMCODE EINGEBEN <i aria-hidden="true">+</i></button>
+        <button type="button" class="c7-join-toggle" id="joinToggle">ENTER ROOM CODE <i aria-hidden="true">+</i></button>
         <div class="c7-join hidden" id="joinPanel">
           <input id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" />
-          <button type="button" id="joinBtn">BEITRETEN</button>
+          <button type="button" id="joinBtn">JOIN</button>
         </div>
       </div>
     </aside>
   </div>
 
   <footer class="c7-foot">
-    <span>&copy; 2026 SNOWBALL WARFARE</span>
+    <span>&copy; 2026 SNOWBOUND</span>
     <span class="c7-foot-hint"><b>ENTER</b> START &middot; <b>ESC</b> PAUSE</span>
   </footer>
 
   <section class="c7-options hidden" id="optionsPanel" role="dialog" aria-modal="true" aria-labelledby="optionsTitle">
     <div class="c7-opt-head">
-      <b id="optionsTitle">OPTIONEN</b>
-      <button class="c7-gear" id="optionsClose" aria-label="Schliessen">&times;</button>
+      <b id="optionsTitle">OPTIONS</b>
+      <button class="c7-gear" id="optionsClose" aria-label="Close">&times;</button>
     </div>
     <label class="field">
-      <span>QUALIT&Auml;T</span>
+      <span>QUALITY</span>
       <select id="qualitySel">
-        <option value="high" selected>Hoch</option>
-        <option value="mid">Mittel</option>
-        <option value="low">Niedrig</option>
+        <option value="high" selected>High</option>
+        <option value="mid">Medium</option>
+        <option value="low">Low</option>
       </select>
     </label>
     <label class="field">
@@ -194,27 +194,27 @@
       </select>
     </label>
     <label class="slider">
-      <span>MAUS-EMPFINDLICHKEIT <b id="sensVal">1.0</b></span>
+      <span>MOUSE SENSITIVITY <b id="sensVal">1.0</b></span>
       <input id="sensRange" type="range" min="0.3" max="2.6" step="0.05" value="1" />
     </label>
     <label class="slider">
-      <span>LAUTST&Auml;RKE <b id="volVal">80%</b></span>
+      <span>VOLUME <b id="volVal">80%</b></span>
       <input id="volRange" type="range" min="0" max="1" step="0.05" value="0.8" />
     </label>
     <label class="check">
       <input type="checkbox" id="fpsToggle" />
-      <span>FPS-ANZEIGE <kbd>F</kbd></span>
+      <span>FPS COUNTER <kbd>F</kbd></span>
     </label>
-    <button type="button" class="c7-opt-wide" id="fullscreenBtn">VOLLBILD</button>
+    <button type="button" class="c7-opt-wide" id="fullscreenBtn">FULLSCREEN</button>
     <div class="c7-keys">
-      <div><kbd>WASD</kbd><span>Bewegen</span></div>
-      <div><kbd>SHIFT</kbd><span>Sprint tippen</span></div>
-      <div><kbd>CTRL</kbd><span>Ducken / Slide</span></div>
-      <div><kbd>SPACE</kbd><span>Springen</span></div>
-      <div><kbd>LMB</kbd><span>Werfen</span></div>
-      <div><kbd>TAB</kbd><span>Rangliste</span></div>
+      <div><kbd>WASD</kbd><span>Move</span></div>
+      <div><kbd>SHIFT</kbd><span>Tap to sprint</span></div>
+      <div><kbd>CTRL</kbd><span>Crouch / Slide</span></div>
+      <div><kbd>SPACE</kbd><span>Jump</span></div>
+      <div><kbd>LMB</kbd><span>Throw</span></div>
+      <div><kbd>TAB</kbd><span>Scoreboard</span></div>
       <div><kbd>ESC</kbd><span>Pause</span></div>
-      <div><kbd>M</kbd><span>Ton</span></div>
+      <div><kbd>M</kbd><span>Sound</span></div>
     </div>
   </section>
 
@@ -222,20 +222,20 @@
     <div class="c7-info-card">
       <header class="c7-info-head">
         <div>
-          <small>SNOWBALL WARFARE &middot; SEASON 01</small>
-          <h2 id="infoTitle">SO GEHT'S</h2>
+          <small>SNOWBOUND &middot; SEASON 01</small>
+          <h2 id="infoTitle">HOW TO PLAY</h2>
         </div>
-        <button class="c7-gear" id="infoClose" aria-label="Schliessen">&times;</button>
+        <button class="c7-gear" id="infoClose" aria-label="Close">&times;</button>
       </header>
       <div class="c7-info-grid">
-        <div><b>01</b><span>EIN TREFFER</span><p>Wer getroffen wird, ist raus. Kein Respawn, kein Nachladen.</p></div>
-        <div><b>02</b><span>SECHS SPIELER</span><p>Ein Raum, bis zu sechs Spieler. Solo gegen Bots oder mit Freunden per Code.</p></div>
-        <div><b>03</b><span>WERFEN</span><p>Maustaste oder Finger halten, zielen, loslassen. Je l&auml;nger du h&auml;ltst, desto h&auml;rter der Wurf.</p></div>
+        <div><b>01</b><span>ONE HIT</span><p>If you're hit, you're out. No reloading.</p></div>
+        <div><b>02</b><span>SIX PLAYERS</span><p>One room, up to six players. Go solo against bots or invite friends with a code.</p></div>
+        <div><b>03</b><span>THROW</span><p>Hold the mouse button or your finger, aim, release. The longer you hold, the harder the throw.</p></div>
       </div>
       <div class="c7-info-keys">
-        <span><kbd>WASD</kbd> BEWEGEN</span><span><kbd>SHIFT</kbd> SPRINT</span><span><kbd>CTRL</kbd> DUCKEN</span><span><kbd>SPACE</kbd> SPRUNG</span><span><kbd>LMB</kbd> WERFEN</span><span><kbd>TAB</kbd> LISTE</span>
+        <span><kbd>WASD</kbd> MOVE</span><span><kbd>SHIFT</kbd> SPRINT</span><span><kbd>CTRL</kbd> CROUCH</span><span><kbd>SPACE</kbd> JUMP</span><span><kbd>LMB</kbd> THROW</span><span><kbd>TAB</kbd> SCOREBOARD</span>
       </div>
-      <p class="c7-info-note">Auf dem Handy: Querformat, Joystick links, Blick rechts, Werfen-Button unten rechts.</p>
+      <p class="c7-info-note">On mobile: landscape, joystick on the left, look on the right, throw button at the bottom right.</p>
     </div>
   </div>
 
@@ -251,7 +251,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.4a2 2 0 1 1 2.2 2c-.9.3-1.2 1-1.2 1.8M12 11.2 3.4 16.2h17.2L12 11.2Z"/></svg>
             SAVED
           </span>
-          <button type="button" class="locker-close" id="customizeClose" aria-label="Locker schliessen">&times;</button>
+          <button type="button" class="locker-close" id="customizeClose" aria-label="Close locker">&times;</button>
         </div>
       </header>
       <div class="locker-body">
@@ -273,40 +273,40 @@
       </div>
     </section>
     <div class="locker-rotate">
-      <button type="button" class="locker-spin" id="lockerSpinL" aria-label="Vorschau nach links drehen">&#8592;</button>
+      <button type="button" class="locker-spin" id="lockerSpinL" aria-label="Rotate preview left">&#8592;</button>
       <span>DRAG TO ROTATE</span>
-      <button type="button" class="locker-spin" id="lockerSpinR" aria-label="Vorschau nach rechts drehen">&#8594;</button>
+      <button type="button" class="locker-spin" id="lockerSpinR" aria-label="Rotate preview right">&#8594;</button>
     </div>
   </div>
 
   <div id="loading" class="loading hidden">
     <div class="spinner"></div>
-    <div id="loadingText">Raum wird erstellt &hellip;</div>
+    <div id="loadingText">Creating room&hellip;</div>
   </div>
 </div>
 
 <!-- ===================== ROTATE / FULLSCREEN ===================== -->
 <div id="rotate" role="alert">
   <div class="rotate-phone" aria-hidden="true"><i></i></div>
-  <b>QUERFORMAT</b>
-  <span>Drehe dein Ger&auml;t. Snowball Warfare l&auml;uft nur im Querformat.</span>
-  <button type="button" id="rotateGo">VOLLBILD &amp; QUERFORMAT</button>
+  <b>LANDSCAPE</b>
+  <span>Rotate your device. Snowbound only runs in landscape.</span>
+  <button type="button" id="rotateGo">FULLSCREEN &amp; LANDSCAPE</button>
 </div>
 
 <!-- ===================== PAUSE ===================== -->
 <div id="pause" class="fullscreen hidden">
   <div class="pause-card panel">
-    <div class="pause-kicker">MATCH H&Auml;LT AN</div>
+    <div class="pause-kicker">MATCH PAUSED</div>
     <h2>PAUSE</h2>
-    <p>Das Match läuft weiter. Du bist verwundbar.</p>
+    <p>The match keeps running. You are vulnerable.</p>
     <div class="pause-actions">
-      <button class="btn primary" id="resumeBtn">WEITERSPIELEN</button>
-      <button class="btn" id="leaveBtn">SPIEL VERLASSEN</button>
+      <button class="btn primary" id="resumeBtn">RESUME</button>
+      <button class="btn" id="leaveBtn">LEAVE MATCH</button>
     </div>
     <div class="pause-controls">
-      <span><kbd>ESC</kbd> Pause</span><span><kbd>TAB</kbd> Rangliste</span><span><kbd>M</kbd> Ton</span>
+      <span><kbd>ESC</kbd> Pause</span><span><kbd>TAB</kbd> Scoreboard</span><span><kbd>M</kbd> Sound</span>
     </div>
-    <div class="pause-room"><span>RAUMCODE</span> <b id="pauseCode">-----</b> <button class="mini" id="copyCode">KOPIEREN</button></div>
+    <div class="pause-room"><span>ROOM CODE</span> <b id="pauseCode">-----</b> <button class="mini" id="copyCode">COPY</button></div>
   </div>
 </div>
 
@@ -314,12 +314,12 @@
 <div id="death" class="hidden">
   <div class="death-vignette"></div>
   <div class="death-card">
-    <div class="death-kicker">AUSGESCHALTET</div>
-    <h2>ELIMINIERT</h2>
-    <p class="death-sub">Getroffen von <b id="deathKiller">Unbekannt</b></p>
+    <div class="death-kicker">KNOCKED OUT</div>
+    <h2>ELIMINATED</h2>
+    <p class="death-sub">Hit by <b id="deathKiller">Unknown</b></p>
     <div class="respawn">
       <div class="respawn-bar"><i id="respawnBar"></i></div>
-      <div id="respawnText">NEUER EINSATZ IN 3.2 s</div>
+      <div id="respawnText">RESPAWNING IN 3.2 s</div>
     </div>
   </div>
 </div>
@@ -327,9 +327,9 @@
 <!-- ===================== MATCH END ===================== -->
 <div id="matchBanner" class="hidden">
   <div class="match-card">
-    <div class="tiny">RUNDE BEENDET</div>
-    <h2 id="matchText">SIEGER</h2>
-    <p id="matchSub">Neue Runde startet gleich …</p>
+    <div class="tiny">ROUND OVER</div>
+    <h2 id="matchText">WINNER</h2>
+    <p id="matchSub">Next round starting soon…</p>
   </div>
 </div>
 

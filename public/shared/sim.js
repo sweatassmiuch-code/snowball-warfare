@@ -12,7 +12,7 @@ import {
 const BOT_DEFS = [
   { name: 'Frost', skill: 0.88, style: 'sniper', range: [20, 34], cadence: [2400, 3800], speed: 4.0 },
   { name: 'Yeti', skill: 0.74, style: 'rusher', range: [7, 14], cadence: [1500, 2500], speed: 5.2 },
-  { name: 'Eiswolf', skill: 0.81, style: 'skirmisher', range: [12, 22], cadence: [1800, 2900], speed: 4.7 }
+  { name: 'Icewolf', skill: 0.81, style: 'skirmisher', range: [12, 22], cadence: [1800, 2900], speed: 4.7 }
 ];
 
 // Palette slots are small integers; everything else is rejected so a peer
@@ -63,7 +63,7 @@ export class GameSim {
   }
 
   addPlayer(id, name, look) {
-    const clean = String(name || 'Gast').replace(/[^\w\u00c0-\u024f .-]/g, '').trim().slice(0, 14) || 'Gast';
+    const clean = String(name || 'Guest').replace(/[^\w\u00c0-\u024f .-]/g, '').trim().slice(0, 14) || 'Guest';
     const spawn = pickSpawn(this.players.values(), id);
     const p = makePlayerState(id, clean, false, spawn);
     p.spawnProtect = Date.now() + 2000;
@@ -249,7 +249,7 @@ export class GameSim {
     this.emit({
       t: 'kill',
       v: victim.id, vn: victim.name,
-      s: shooter ? shooter.id : null, sn: shooter ? shooter.name : 'Welt',
+      s: shooter ? shooter.id : null, sn: shooter ? shooter.name : 'World',
       k: shooter ? shooter.kills : 0,
       x: hit.x, y: hit.y, z: hit.z
     });

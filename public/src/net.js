@@ -22,7 +22,7 @@ function openPeer(id) {
       if (done) return;
       done = true;
       try { peer.destroy(); } catch {}
-      reject(new Error('Signalisierung antwortet nicht. Internetverbindung prüfen.'));
+      reject(new Error('Signalling is not responding. Check your internet connection.'));
     }, 16000);
 
     peer.on('open', () => {
@@ -48,7 +48,7 @@ function waitForOpen(conn, timeout = 14000) {
       if (done) return;
       done = true;
       try { conn.close(); } catch {}
-      reject(new Error('Verbindung zum Host nicht möglich.'));
+      reject(new Error('Could not connect to the host.'));
     }, timeout);
     conn.on('open', () => {
       if (done) return;
@@ -67,11 +67,11 @@ function waitForOpen(conn, timeout = 14000) {
 
 function friendly(err) {
   const type = err?.type || '';
-  if (type === 'peer-unavailable') return 'Raum nicht gefunden. Code prüfen.';
-  if (type === 'unavailable-id') return 'Raumcode bereits vergeben. Bitte erneut versuchen.';
-  if (type === 'network' || type === 'server-error') return 'Signalisierungs-Server nicht erreichbar.';
-  if (type === 'browser-incompatible') return 'Dieser Browser unterstützt WebRTC nicht.';
-  return err?.message || 'Unbekannter Netzwerkfehler.';
+  if (type === 'peer-unavailable') return 'Room not found. Check the code.';
+  if (type === 'unavailable-id') return 'Room code already in use. Please try again.';
+  if (type === 'network' || type === 'server-error') return 'Signalling server unreachable.';
+  if (type === 'browser-incompatible') return 'This browser does not support WebRTC.';
+  return err?.message || 'Unknown network error.';
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ export class HostSession {
       return;
     }
 
-    const name = String(conn.metadata?.name || 'Gast').slice(0, 14) || 'Gast';
+    const name = String(conn.metadata?.name || 'Guest').slice(0, 14) || 'Guest';
     const look = conn.metadata?.look || null;
     conn.on('open', () => {
       this.connections.set(conn.peer, conn);
@@ -235,7 +235,7 @@ export class GuestSession {
     this.peer.on('error', (err) => {
       if (this.closed) return;
       if (err?.type === 'peer-unavailable') {
-        this.handlers.onError?.('Raum nicht gefunden. Code prüfen.');
+        this.handlers.onError?.('Room not found. Check the code.');
       }
     });
 
@@ -250,7 +250,7 @@ export class GuestSession {
       const timer = setTimeout(() => {
         if (done) return;
         done = true;
-        reject(new Error('Keine Antwort vom Host.'));
+        reject(new Error('No response from the host.'));
       }, 16000);
       conn.on('data', (msg) => {
         if (!msg || typeof msg !== 'object') return;
@@ -263,7 +263,7 @@ export class GuestSession {
         if (msg.t === 'full') {
           done = true;
           clearTimeout(timer);
-          reject(new Error('Raum ist voll (max. 8 Spieler).'));
+          reject(new Error('Room is full (max. 8 players).'));
           return;
         }
         this.onData(msg);
@@ -272,7 +272,7 @@ export class GuestSession {
         if (!done) {
           done = true;
           clearTimeout(timer);
-          reject(new Error('Verbindung abgelehnt.'));
+          reject(new Error('Connection refused.'));
         }
       });
     });
@@ -286,11 +286,11 @@ export class GuestSession {
 
     conn.on('close', () => {
       if (this.closed) return;
-      this.handlers.onClosed?.('Der Host hat das Spiel verlassen.');
+      this.handlers.onClosed?.('The host left the game.');
     });
     conn.on('error', () => {
       if (this.closed) return;
-      this.handlers.onClosed?.('Verbindung zum Host verloren.');
+      this.handlers.onClosed?.('Lost connection to the host.');
     });
 
     this.peer.on('disconnected', () => { try { this.peer.reconnect(); } catch {} });

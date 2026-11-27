@@ -141,7 +141,7 @@ try {
     preserveDrawingBuffer: DEBUG
   });
 } catch (e) {
-  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#fff">WebGL wird benötigt, um dieses Spiel zu starten.</div>';
+  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#fff">WebGL is required to start this game.</div>';
   throw e;
 }
 
@@ -460,7 +460,7 @@ function showToast(text) {
 function addFeed(shooterName, victimName, isMine) {
   const el = document.createElement('div');
   el.className = 'feed';
-  const shooter = shooterName || 'Welt';
+  const shooter = shooterName || 'World';
   el.innerHTML = `<b>${escapeHtml(shooter)}</b><span class="skull">✦</span><b>${escapeHtml(victimName)}</b>`;
   if (isMine) el.style.borderRightColor = '#ffd08a';
   ui.killfeed.prepend(el);
@@ -474,7 +474,7 @@ function escapeHtml(s) {
 }
 
 function nameOf(id) {
-  return G.roster.get(id)?.name || 'Spieler';
+  return G.roster.get(id)?.name || 'Player';
 }
 
 function setRoomCode(code) {
@@ -486,7 +486,7 @@ function copyCode() {
   const code = ui.roomCode.textContent;
   if (!code || code === '-----') return;
   navigator.clipboard?.writeText(code).then(() => {
-    showToast('Raumcode kopiert: ' + code);
+    showToast('Room code copied: ' + code);
     audio.ui();
   }).catch(() => showToast('Code: ' + code));
 }
@@ -499,7 +499,7 @@ function showHitmarker(kill) {
 }
 
 function pushFeedNames(s, v, mine) {
-  addFeed(s ? nameOf(s) : 'Welt', nameOf(v), mine);
+  addFeed(s ? nameOf(s) : 'World', nameOf(v), mine);
 }
 
 // ---------------------------------------------------------------------------
@@ -532,7 +532,7 @@ ui.botsSel.addEventListener('change', () => {
 ui.muteBtn.addEventListener('click', () => {
   audio.init();
   audio.setMuted(!audio.isMuted());
-  ui.muteBtn.textContent = audio.isMuted() ? 'TON AUS' : 'TON AN';
+  ui.muteBtn.textContent = audio.isMuted() ? 'SOUND OFF' : 'SOUND ON';
 });
 ui.roomChip.addEventListener('click', copyCode);
 ui.copyCode.addEventListener('click', copyCode);
@@ -548,7 +548,7 @@ function setMenuStatus(text, cls = '') {
   ui.menuStatus.className = 'c7-status ' + cls;
 }
 
-function setLoading(on, text = 'Verbinde …') {
+function setLoading(on, text = 'Connecting…') {
   ui.loading.classList.toggle('hidden', !on);
   ui.loadingText.textContent = text;
   ui.hostBtn.disabled = on;
@@ -1135,11 +1135,11 @@ ui.hostBtn.addEventListener('click', async () => {
   audio.init();
   audio.setVolume(settings.vol);
   if (isTouch) goImmersive();
-  const name = (ui.nameInput.value.trim() || 'Gast').slice(0, 14);
+  const name = (ui.nameInput.value.trim() || 'Guest').slice(0, 14);
   settings.name = name;
   saveSettings();
-  setMenuStatus('Raum wird erstellt …');
-  setLoading(true, 'Raum wird erstellt …');
+  setMenuStatus('Creating room…');
+  setLoading(true, 'Creating room…');
   try {
     const session = hostGame({
       name,
@@ -1161,14 +1161,14 @@ ui.hostBtn.addEventListener('click', async () => {
     ui.hud.classList.remove('hidden');
     ui.menu.classList.add('hidden');
     setLoading(false);
-    setMenuStatus('Bereit.', 'ok');
+    setMenuStatus('Ready.', 'ok');
     G.mode = 'paused';
     openPause(true);
-    showToast('Raum erstellt — Code ' + code + ' teilen');
+    showToast('Room created — share code ' + code);
   } catch (err) {
     console.error(err);
     setLoading(false);
-    setMenuStatus(err.message || 'Raum konnte nicht erstellt werden.', 'err');
+    setMenuStatus(err.message || 'Could not create the room.', 'err');
   }
 });
 
@@ -1178,14 +1178,14 @@ ui.joinBtn.addEventListener('click', async () => {
   if (isTouch) goImmersive();
   const code = (ui.joinCode.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length < 4) {
-    setMenuStatus('Bitte einen gültigen Raumcode eingeben.', 'err');
+    setMenuStatus('Please enter a valid room code.', 'err');
     return;
   }
-  const name = (ui.nameInput.value.trim() || 'Gast').slice(0, 14);
+  const name = (ui.nameInput.value.trim() || 'Guest').slice(0, 14);
   settings.name = name;
   saveSettings();
-  setMenuStatus('Verbinde mit Raum ' + code + ' …');
-  setLoading(true, 'Verbinde mit Raum ' + code + ' …');
+  setMenuStatus('Joining room ' + code + '…');
+  setLoading(true, 'Joining room ' + code + '…');
   try {
     const session = joinGame({
       code,
@@ -1213,11 +1213,11 @@ ui.joinBtn.addEventListener('click', async () => {
     await session.start();
     G.session = session;
     setLoading(false);
-    setMenuStatus('Verbunden.', 'ok');
+    setMenuStatus('Connected.', 'ok');
   } catch (err) {
     console.error(err);
     setLoading(false);
-    setMenuStatus(err.message || 'Verbindung fehlgeschlagen.', 'err');
+    setMenuStatus(err.message || 'Connection failed.', 'err');
   }
 });
 
@@ -1278,7 +1278,7 @@ function handleState(snap) {
       G.pitch = meEntry[5];
     }
     if (!dead && G.dead) reviveSelf(meEntry);
-    else if (dead && !G.dead) dieSelf(G.killer || 'Unbekannt');
+    else if (dead && !G.dead) dieSelf(G.killer || 'Unknown');
   }
 
   if (snap.end > 0 && !G.matchEnd) {
@@ -1290,7 +1290,7 @@ function handleState(snap) {
 function updateRemote(id, p) {
   let r = G.remotes.get(id);
   if (!r) {
-    const info = G.roster.get(id) || { name: 'Spieler', bot: false };
+    const info = G.roster.get(id) || { name: 'Player', bot: false };
     const ch = createCharacter(characterColor(id), info.look);
     const tag = makeNameTag(info.name, characterColor(id));
     ch.root.add(tag);
@@ -1363,7 +1363,7 @@ function handleEvent(msg) {
   if (msg.t === 'kill') {
     pushFeedNames(msg.s, msg.v, msg.s === G.selfId || msg.v === G.selfId);
     if (msg.v === G.selfId) {
-      G.killer = msg.sn || 'Unbekannt';
+      G.killer = msg.sn || 'Unknown';
       dieSelf(G.killer);
     }
     if (msg.s === G.selfId) {
@@ -1396,8 +1396,8 @@ function handleEvent(msg) {
 
   if (msg.t === 'matchEnd') {
     G.matchEnd = true;
-    ui.matchText.textContent = msg.winner.name + ' GEWINNT';
-    ui.matchSub.textContent = `${msg.score} Eliminierungen · neue Runde in wenigen Sekunden`;
+    ui.matchText.textContent = msg.winner.name + ' WINS';
+    ui.matchSub.textContent = `${msg.score} eliminations · next round in a few seconds`;
     ui.matchBanner.classList.remove('hidden');
     audio.matchEnd();
     return;
@@ -1407,13 +1407,13 @@ function handleEvent(msg) {
     G.matchEnd = false;
     G.scores.clear();
     ui.matchBanner.classList.add('hidden');
-    showToast('Neue Runde — viel Erfolg');
+    showToast('New round — good luck');
     return;
   }
 
   if (msg.t === 'join') {
     G.roster.set(msg.id, { name: msg.name, bot: msg.bot });
-    if (!msg.bot && msg.id !== G.selfId) showToast(msg.name + ' ist beigetreten');
+    if (!msg.bot && msg.id !== G.selfId) showToast(msg.name + ' joined');
     return;
   }
 
@@ -1425,7 +1425,7 @@ function handleEvent(msg) {
       disposeObject(r.root);
       G.remotes.delete(msg.id);
     }
-    if (!msg.bot) showToast(msg.name + ' hat verlassen');
+    if (!msg.bot) showToast(msg.name + ' left');
     return;
   }
 }
@@ -1496,7 +1496,7 @@ function updateDeathUI(dt) {
   const p = Math.min(1, elapsed / (RESPAWN_MS / 1000));
   ui.respawnBar.style.width = (p * 100) + '%';
   const remain = Math.max(0, RESPAWN_MS / 1000 - elapsed);
-  ui.respawnText.textContent = remain > 0 ? `NEUER EINSATZ IN ${remain.toFixed(1)} s` : 'NEUER EINSATZ …';
+  ui.respawnText.textContent = remain > 0 ? `RESPAWNING IN ${remain.toFixed(1)} s` : 'RESPAWNING…';
   G.desat = Math.min(1, G.desat + dt * 2.2);
 }
 
@@ -1505,11 +1505,11 @@ function updateDeathUI(dt) {
 // ---------------------------------------------------------------------------
 function openPause(first = false) {
   ui.pause.classList.remove('hidden');
-  ui.resumeBtn.textContent = first ? 'EINSATZ STARTEN' : 'WEITERSPIELEN';
-  ui.pause.querySelector('h2').textContent = first ? 'BEREIT' : 'PAUSE';
+  ui.resumeBtn.textContent = first ? 'START MATCH' : 'RESUME';
+  ui.pause.querySelector('h2').textContent = first ? 'READY' : 'PAUSE';
   ui.pause.querySelector('p').textContent = first
-    ? 'Klicke, um die Maus zu steuern. Esc öffnet später die Pause.'
-    : 'Das Match läuft weiter. Du bist verwundbar.';
+    ? 'Click to capture the mouse. Esc opens the pause menu later.'
+    : 'The match keeps running. You are vulnerable.';
   ui.scoreboard.classList.add('hidden');
 }
 
@@ -1620,7 +1620,7 @@ function leaveGame(message = '') {
   ui.onlineCount.textContent = '1';
   ui.pingVal.textContent = '0';
   setRoomCode(null);
-  setMenuStatus(message || 'Bereit.', message ? 'err' : '');
+  setMenuStatus(message || 'Ready.', message ? 'err' : '');
 
   // A clean play tab, then the main screen.
   setMenuTab('play');
@@ -1728,14 +1728,14 @@ window.addEventListener('keydown', (e) => {
   if (key === 'KeyM') {
     audio.init();
     audio.setMuted(!audio.isMuted());
-    ui.muteBtn.textContent = audio.isMuted() ? 'TON AUS' : 'TON AN';
+    ui.muteBtn.textContent = audio.isMuted() ? 'SOUND OFF' : 'SOUND ON';
     return;
   }
   if (key === 'KeyF') {
     settings.showFps = !settings.showFps;
     saveSettings();
     ui.perfChip.classList.toggle('hidden', !settings.showFps);
-    showToast(settings.showFps ? 'FPS-Anzeige an' : 'FPS-Anzeige aus');
+    showToast(settings.showFps ? 'FPS display on' : 'FPS display off');
     return;
   }
   if (key === 'ShiftLeft' || key === 'ShiftRight') {

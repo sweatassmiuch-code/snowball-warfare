@@ -1,7 +1,7 @@
 {
-  "name": "Snowball Warfare",
-  "short_name": "Snowball",
-  "description": "Ein Treffer. Tot.",
+  "name": "Snowbound",
+  "short_name": "Snowbound",
+  "description": "One hit. You're out.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
