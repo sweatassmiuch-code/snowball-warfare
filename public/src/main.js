@@ -732,16 +732,19 @@ const preview = (() => {
     // the character owns its root yaw, so the turn goes through update() --
     // that keeps the idle lean and turn smoothing in one place
     ch.update(dt, { speed: 0, grounded: true, yaw });
-    // relaxed stance: both sleeves hang out beside the jacket and the right
-    // mitten carries the snowball at hip height. The old pose folded the arm
-    // across the belly, which hid the shoulder and looked like an illusion.
+    // Relaxed stance: both sleeves hang beside the jacket and the right mitten
+    // carries the snowball at hip height. Keep the character's own breathing,
+    // weight shift and glance, and only offset the arms enough for the pose --
+    // the old override froze them into a mannequin.
     const sway = Math.sin(clock * 1.3) * 0.012;
-    ch.armR.shoulder.rotation.x = 0.07 + sway;
-    ch.armR.shoulder.rotation.z = 0.145;
-    ch.armR.elbow.rotation.x = 0.14;
-    ch.armL.shoulder.rotation.x = 0.03 - sway;
-    ch.armL.shoulder.rotation.z = -0.135;
-    ch.armL.elbow.rotation.x = 0.10;
+    ch.armR.shoulder.rotation.x += 0.02 + sway * 0.6;
+    ch.armR.shoulder.rotation.z += 0.02;
+    ch.armR.elbow.rotation.x = 0.15 + Math.sin(clock * 1.55 + 0.5) * 0.02;
+    ch.armL.shoulder.rotation.x -= 0.02 + sway * 0.6;
+    ch.armL.shoulder.rotation.z -= 0.005;
+    ch.armL.elbow.rotation.x = 0.11 + Math.sin(clock * 1.55 + 1.4) * 0.018;
+    ch.headGroup.rotation.y += Math.sin(clock * 0.37) * 0.05;
+    ch.headGroup.rotation.x += Math.sin(clock * 0.9) * 0.01;
   }
 
   // drag the character to turn it; nothing rotates him on its own
@@ -1611,11 +1614,15 @@ function setTouchMode(on) {
   syncOrientation();
 }
 
-// A real finger on the glass is the only thing that brings the touch layout
-// back after a keyboard press.
+// A real finger brings the touch layout; a mouse movement or click leaves it
+// immediately, without waiting for a key press.
 document.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch' && !isTouch) setTouchMode(true);
+  else if (e.pointerType === 'mouse' && isTouch) setTouchMode(false);
 }, true);
+document.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse' && isTouch) setTouchMode(false);
+}, { passive: true });
 
 ui.touchThrow?.addEventListener('pointerdown', (e) => {
   if (!isTouch) return;

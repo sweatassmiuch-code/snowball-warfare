@@ -1022,7 +1022,9 @@ function limbGeometry(baseX, baseY, baseZ, upperLen, lowerLen, radiusAt, opts = 
   for (let i = 0; i < rings; i++) {
     for (let j = 0; j < radial; j++) {
       const a = i * (radial + 1) + j, b = a + radial + 1;
-      idx.push(a, b, a + 1, b, b + 1, a + 1);
+      // wound outward: the sleeve must be solid from the outside, not a shell
+      // whose normals point into the arm
+      idx.push(a, a + 1, b, b, a + 1, b + 1);
     }
   }
   const geo = new THREE.BufferGeometry();
@@ -1060,7 +1062,8 @@ function taperedTube(curve, radiusAt, segs = 16, radial = 10) {
   for (let i = 0; i < segs; i++) {
     for (let j = 0; j < radial; j++) {
       const a = i * (radial + 1) + j, b = a + radial + 1;
-      idx.push(a, b, a + 1, b, b + 1, a + 1);
+      // same outward winding as the limb tubes
+      idx.push(a, a + 1, b, b, a + 1, b + 1);
     }
   }
   const geo = new THREE.BufferGeometry();
