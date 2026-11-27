@@ -117,11 +117,12 @@ snowdown/
 │  │  ├─ scene.js         Terrain, Wald, Hütte, Licht, Schneefall
 │  │  ├─ character.js     Spielermodelle & First-Person-Hand
 │  │  ├─ fx.js            Partikel, Fußspuren, Einschläge
-│  │  ├─ audio.js         komplett synthetisierter Sound (WebAudio)
+│  │  ├─ audio.js         Sound-Effekte (WebAudio) + Loop des Lobby-Tracks
 │  │  └─ net.js           PeerJS-Host/Gast, Raumcodes
 │  ├─ shared/
 │  │  ├─ world.js         Terrainmathematik, Spawns, Hindernisse
 │  │  └─ sim.js           autoritative Simulation (Host)
+│  ├─ assets/music/       Lobby-Track (Frost Waltz, CC BY 4.0)
 │  ├─ vendor/             three.js r187, peerjs
 │  └─ vercel.json         Header & Caching für Vercel
 └─ serve.mjs              Dev-Server
@@ -150,7 +151,17 @@ snowdown/
   schwingen) und Treffer-Flinch; alle Übergänge werden weich geblendet.
 - **Game Feel:** Zeitlupen-Freeze beim Aufladen, Ziellinie mit Aufschlagring, FOV-Kick,
   Kamera-Recoil, Landestaub, Fußspuren und Atemwolken.
-- **Sound:** Wind, Schritte, Wurf, Einschläge und UI-Töne live per WebAudio synthetisiert.
+- **Sound:** Schritte, Wurf, Einschläge und UI-Töne live per WebAudio synthetisiert;
+  dazu ein echter Musik-Track im Loop (mit Crossfade, damit die Naht nicht knackt).
+
+---
+
+## Musik
+
+„Frost Waltz“ von **Kevin MacLeod** ([incompetech.com](https://incompetech.com)),
+lizenziert unter [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+Der Track liegt als `public/assets/music/frost-waltz.mp3` im Projekt und läuft im
+Loop von der Lobby bis ins Match; der Credit steht zusätzlich im Info-Panel des Spiels.
 
 ---
 

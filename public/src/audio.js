@@ -1,51 +1,31 @@
-// All sound is synthesized with the Web Audio API — no audio files needed.
+// Sound effects are generated with the Web Audio API; the only audio file is
+// the lobby track in assets/music.
 export function createAudio() {
   let ctx = null;
   let master = null;
   let sfx = null;
-  let windGain = null;
-  let windFilter = null;
-  let windHissGain = null;
   let muted = false;
   let volume = 0.8;
-  let windStarted = false;
   let noiseBuffer = null;
-  let brownBuffer = null;
-  let musicIn = null;
   let musicGain = null;
+  let musicBuffer = null;
   let musicStarted = false;
-  let musicStep = 0;
-  let musicNext = 0;
-  let musicTimer = null;
+  let musicNextAt = 0;
+  let musicWatch = null;
 
-  // A slow, cold little loop — Am7, Fmaj7, Cmaj7, G6 at 92 BPM. It starts in
-  // the menu and keeps running through the match, so there is no gap between
-  // lobby and game. Everything is synthesized, nothing to download.
-  const MUSIC_BPM = 92;
-  const MUSIC_STEP = 60 / MUSIC_BPM / 2; // an eighth note
-  const MUSIC_BARS = [
-    { root: 45, notes: [57, 60, 64, 67] },
-    { root: 41, notes: [53, 57, 60, 64] },
-    { root: 48, notes: [48, 52, 55, 59] },
-    { root: 43, notes: [55, 59, 62, 64] }
-  ];
-  const MUSIC_ARP = [0, 2, 1, 3, 2, 1, 3, 2];
-  const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+  // The lobby track: "Frost Waltz" by Kevin MacLeod (incompetech.com), used
+  // under CC BY 4.0. It is decoded once after the first gesture and looped by
+  // hand with a long crossfade, because a plain loop would click on the seam.
+  // It keeps running from the menu straight through the match.
+  const MUSIC_URL = '../assets/music/frost-waltz.mp3';
+  const MUSIC_LEVEL = 0.4;
+  const MUSIC_FADE = 2.5;
 
-  function makeNoiseBuffer(seconds, brown) {
+  function makeNoiseBuffer(seconds) {
     const len = Math.floor(ctx.sampleRate * seconds);
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < len; i++) {
-      const white = Math.random() * 2 - 1;
-      if (brown) {
-        last = (last + 0.02 * white) / 1.02;
-        d[i] = last * 3.2;
-      } else {
-        d[i] = white;
-      }
-    }
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     return buf;
   }
 
@@ -75,66 +55,8 @@ export function createAudio() {
     sfx.gain.value = 1;
     sfx.connect(master);
 
-    noiseBuffer = makeNoiseBuffer(2, false);
-    brownBuffer = makeNoiseBuffer(4, true);
-
-    startWind();
+    noiseBuffer = makeNoiseBuffer(2);
     startMusic();
-  }
-
-  function startWind() {
-    if (windStarted || !ctx) return;
-    windStarted = true;
-
-    const src = ctx.createBufferSource();
-    src.buffer = brownBuffer;
-    src.loop = true;
-
-    windFilter = ctx.createBiquadFilter();
-    windFilter.type = 'lowpass';
-    windFilter.frequency.value = 420;
-    windFilter.Q.value = 0.6;
-
-    windGain = ctx.createGain();
-    windGain.gain.value = 0.20;
-
-    src.connect(windFilter);
-    windFilter.connect(windGain);
-    windGain.connect(master);
-    src.start();
-
-    // slow gusts
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.055;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 110;
-    lfo.connect(lfoGain);
-    lfoGain.connect(windFilter.frequency);
-    lfo.start();
-
-    const lfo2 = ctx.createOscillator();
-    lfo2.frequency.value = 0.033;
-    const lfo2Gain = ctx.createGain();
-    lfo2Gain.gain.value = 0.07;
-    lfo2.connect(lfo2Gain);
-    lfo2Gain.connect(windGain.gain);
-    lfo2.start();
-
-    // thin high hiss
-    const hiss = ctx.createBufferSource();
-    hiss.buffer = noiseBuffer;
-    hiss.loop = true;
-    const hissFilter = ctx.createBiquadFilter();
-    hissFilter.type = 'bandpass';
-    hissFilter.frequency.value = 2100;
-    hissFilter.Q.value = 0.7;
-    windHissGain = ctx.createGain();
-    windHissGain.gain.value = 0.022;
-    hiss.connect(hissFilter);
-    hissFilter.connect(windHissGain);
-    windHissGain.connect(master);
-    hiss.start();
   }
 
   function setVolume(v) {
@@ -201,181 +123,54 @@ export function createAudio() {
     return { vol, pan };
   }
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Music
-  // -------------------------------------------------------------------------
-  function makeImpulse(seconds, decay) {
-    const len = Math.floor(ctx.sampleRate * seconds);
-    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let c = 0; c < 2; c++) {
-      const d = buf.getChannelData(c);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
-    }
-    return buf;
-  }
-
-  function padVoice(t, chord, dur) {
-    const f = ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.setValueAtTime(620, t);
-    f.frequency.linearRampToValueAtTime(1400, t + dur * 0.55);
-    f.frequency.linearRampToValueAtTime(700, t + dur);
-    f.Q.value = 0.5;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(1, t + 1.1);
-    g.gain.setTargetAtTime(0.0001, t + dur - 0.45, 0.55);
-    f.connect(g);
-    g.connect(musicIn);
-    chord.notes.forEach((m, i) => {
-      const o = ctx.createOscillator();
-      o.type = i ? 'sawtooth' : 'triangle';
-      o.frequency.value = hz(m);
-      o.detune.value = (i - 1.5) * 7;
-      const og = ctx.createGain();
-      og.gain.value = i ? 0.035 : 0.055;
-      o.connect(og);
-      og.connect(f);
-      o.start(t);
-      o.stop(t + dur + 1.8);
-    });
-  }
-
-  function bassVoice(t, midi, dur) {
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(hz(midi), t);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g);
-    g.connect(musicIn);
-    o.start(t);
-    o.stop(t + dur + 0.1);
-  }
-
-  function pluck(t, midi, gain, pan) {
-    const f = ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = 3200;
-    f.Q.value = 0.4;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-    const p = ctx.createStereoPanner();
-    p.pan.value = Math.max(-1, Math.min(1, pan));
-    [["triangle", midi, 1], ["sine", midi + 12, 0.45]].forEach(([type, m, k]) => {
-      const o = ctx.createOscillator();
-      o.type = type;
-      o.frequency.value = hz(m);
-      const og = ctx.createGain();
-      og.gain.value = k;
-      o.connect(og);
-      og.connect(f);
-      o.start(t);
-      o.stop(t + 0.6);
-    });
-    f.connect(g);
-    g.connect(p);
-    p.connect(musicIn);
-  }
-
-  function shaker(t, gain, pan) {
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuffer;
-    const f = ctx.createBiquadFilter();
-    f.type = 'highpass';
-    f.frequency.value = 6800;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
-    const p = ctx.createStereoPanner();
-    p.pan.value = Math.max(-1, Math.min(1, pan));
-    src.connect(f);
-    f.connect(g);
-    g.connect(p);
-    p.connect(musicIn);
-    src.start(t, Math.random() * 1.5);
-    src.stop(t + 0.14);
-  }
-
-  function softKick(t, gain) {
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(105, t);
-    o.frequency.exponentialRampToValueAtTime(42, t + 0.22);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-    o.connect(g);
-    g.connect(musicIn);
-    o.start(t);
-    o.stop(t + 0.34);
-  }
-
-  function startMusic() {
+  // ---------------------------------------------------------------------------
+  async function startMusic() {
     if (musicStarted || !ctx) return;
     musicStarted = true;
 
-    musicIn = ctx.createGain();
-    musicIn.gain.value = 1;
-
-    // gentle top end so the loop never fights the snow and the hit sounds
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 2600;
-    lp.Q.value = 0.3;
-
     musicGain = ctx.createGain();
-    musicGain.gain.value = 0.55;
-
-    // small generated hall, keeps the loop behind the wind instead of on top
-    const conv = ctx.createConvolver();
-    conv.buffer = makeImpulse(2.4, 2.8);
-    const send = ctx.createGain();
-    send.gain.value = 0.42;
-
-    musicIn.connect(lp);
-    lp.connect(musicGain);
-    lp.connect(send);
-    send.connect(conv);
-    conv.connect(musicGain);
+    musicGain.gain.value = MUSIC_LEVEL;
     musicGain.connect(master);
 
-    musicNext = ctx.currentTime + 0.2;
+    try {
+      const res = await fetch(new URL(MUSIC_URL, import.meta.url));
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      musicBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
+    } catch (err) {
+      console.warn('Lobby music unavailable:', err.message);
+      return;
+    }
+
+    musicNextAt = ctx.currentTime + 0.1;
     scheduleMusic();
-    musicTimer = setInterval(scheduleMusic, 50);
+    musicWatch = setInterval(scheduleMusic, 500);
   }
 
+  // Keeps the next loop queued ahead of time, so the crossfade always has a
+  // partner voice and a throttled timer cannot open a gap.
   function scheduleMusic() {
-    if (!ctx || !musicStarted) return;
-    // a suspended tab freezes currentTime; do not queue a pile of notes into it
-    if (ctx.state !== 'running') { musicNext = ctx.currentTime + 0.08; return; }
-    if (musicNext < ctx.currentTime) { musicNext = ctx.currentTime + 0.08; musicStep = 0; }
-    while (musicNext < ctx.currentTime + 0.3) {
-      playMusicStep(musicStep, musicNext);
-      musicStep = (musicStep + 1) % 32;
-      musicNext += MUSIC_STEP;
+    if (!musicBuffer || !ctx || ctx.state !== 'running') return;
+    while (musicNextAt < ctx.currentTime + MUSIC_FADE * 2) {
+      playMusicLoop(musicNextAt);
+      musicNextAt += musicBuffer.duration - MUSIC_FADE;
     }
   }
 
-  function playMusicStep(step, t) {
-    const barIndex = Math.floor(step / 8) % MUSIC_BARS.length;
-    const bar = MUSIC_BARS[barIndex];
-    const beat = step % 8;
-    if (beat === 0) {
-      padVoice(t, bar, MUSIC_STEP * 8);
-      bassVoice(t, bar.root, MUSIC_STEP * 7.2);
-      softKick(t, 0.16);
-    } else if (beat === 4) {
-      bassVoice(t, bar.root, MUSIC_STEP * 3.2);
-    }
-    pluck(t, bar.notes[MUSIC_ARP[beat]] + 12, beat === 0 ? 0.13 : 0.085, beat % 2 ? 0.3 : -0.3);
-    if (beat % 2 === 1) shaker(t, 0.05, beat % 4 === 1 ? -0.4 : 0.4);
+  function playMusicLoop(when) {
+    const end = when + musicBuffer.duration;
+    const src = ctx.createBufferSource();
+    src.buffer = musicBuffer;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.linearRampToValueAtTime(1, when + MUSIC_FADE);
+    g.gain.setValueAtTime(1, end - MUSIC_FADE);
+    g.gain.linearRampToValueAtTime(0.0001, end);
+    src.connect(g);
+    g.connect(musicGain);
+    src.start(when);
+    src.stop(end + 0.05);
   }
 
   const audio = {
@@ -435,14 +230,6 @@ export function createAudio() {
       tone({ freq: 220, to: 55, dur: 0.7, gain: 0.45, type: 'sine' });
       noiseBurst({ dur: 1.2, freq: 380, q: 0.4, gain: 0.4, type: 'lowpass' });
       noiseBurst({ dur: 0.35, freq: 900, q: 0.6, gain: 0.25 });
-      // wind swell
-      if (windGain) {
-        const t = ctx.currentTime;
-        windGain.gain.cancelScheduledValues(t);
-        windGain.gain.setValueAtTime(windGain.gain.value, t);
-        windGain.gain.linearRampToValueAtTime(0.6, t + 0.6);
-        windGain.gain.linearRampToValueAtTime(0.2, t + 3.2);
-      }
     },
 
     respawn() {
