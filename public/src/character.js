@@ -786,10 +786,11 @@ function materialsFor(idx, look) {
       sheenColor: new THREE.Color(hairColor).lerp(new THREE.Color(0xffd9b0), 0.5),
       envMapIntensity: 0.6
     }),
+    // Smooth knitted mittens: no leather normal map, so the small hand does
+    // not read as a cracked stone at menu distance.
     mitten: new THREE.MeshPhysicalMaterial({
-      color: 0x24272f, roughness: 0.7, metalness: 0,
-      normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.18, 0.18),
-      sheen: 0.3, sheenRoughness: 0.6, sheenColor: new THREE.Color(0x7b8598), envMapIntensity: 0.8
+      color: 0x24272f, roughness: 0.74, metalness: 0,
+      sheen: 0.34, sheenRoughness: 0.55, sheenColor: new THREE.Color(0x7b8598), envMapIntensity: 0.8
     }),
     leather: new THREE.MeshPhysicalMaterial({
       color: 0x1d2126, roughness: 0.58, metalness: 0.04,
@@ -1383,10 +1384,10 @@ export function createCharacter(colorIdx, look) {
     const hand = new THREE.Group();
     hand.position.y = -0.296;
     elbow.add(hand);
-    add(hand, new THREE.CapsuleGeometry(0.054, 0.060, 5, 16), m.mitten,
+    add(hand, new THREE.CapsuleGeometry(0.056, 0.056, 10, 24), m.mitten,
       [0, -0.056, -0.006], [0.06, 0, 0], [1.03, 1.04, 0.92]);
-    add(hand, new THREE.CapsuleGeometry(0.023, 0.048, 4, 12), m.mitten,
-      [side * -0.043, -0.048, -0.016], [0.30, 0, side * 0.95]);
+    add(hand, new THREE.CapsuleGeometry(0.024, 0.044, 8, 18), m.mitten,
+      [side * -0.040, -0.050, -0.014], [0.32, 0, side * 0.95], [1, 1, 0.96]);
     return { shoulder, elbow, hand };
   }
   const armR = makeArm(1);
@@ -1813,9 +1814,9 @@ export function createViewModel(look) {
   ], 26), glove, [0, 0, 0]);
   mitten.castShadow = false;
 
-  // fingers: one mitten band curled across the ball's lower front, with three
-  // soft knuckle waves in it and rounded ends. Separate tubes read as teeth
-  // from this angle; a band with a shaped radius reads as a closed hand.
+  // fingers: one smooth mitten band curled across the ball's lower front,
+  // with a soft swell in the middle and rounded ends. Three sharp knuckle
+  // waves read as cracks at this angle; one calm band reads as a closed hand.
   const fingerCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(0.064, 0.286, -0.012),
     new THREE.Vector3(0.048, 0.276, 0.026),
@@ -1824,7 +1825,7 @@ export function createViewModel(look) {
     new THREE.Vector3(-0.054, 0.287, 0.012)
   ]);
   const fingers = add(armPivot,
-    taperedTube(fingerCurve, (t) => 0.0212 - 0.0020 * Math.cos(t * Math.PI * 6), 26, 12),
+    taperedTube(fingerCurve, (t) => 0.0210 + 0.0012 * Math.sin(t * Math.PI), 28, 18),
     glove, [0, 0, 0]);
   fingers.castShadow = false;
   for (const t of [0, 1]) {
@@ -1839,7 +1840,7 @@ export function createViewModel(look) {
     new THREE.Vector3(-0.078, 0.262, 0.044),
     new THREE.Vector3(-0.056, 0.286, 0.020)
   ]);
-  const thumb = add(armPivot, new THREE.TubeGeometry(thumbCurve, 20, 0.0205, 12, false), glove, [0, 0, 0]);
+  const thumb = add(armPivot, new THREE.TubeGeometry(thumbCurve, 24, 0.0205, 18, false), glove, [0, 0, 0]);
   thumb.castShadow = false;
   for (const p of [thumbCurve.points[0], thumbCurve.points[3]]) {
     add(armPivot, new THREE.SphereGeometry(0.0205, 14, 10), glove, [p.x, p.y, p.z]);
