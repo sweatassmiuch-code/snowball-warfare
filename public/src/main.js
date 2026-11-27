@@ -16,17 +16,15 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
-const coarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
-const hoverPointer = window.matchMedia ? window.matchMedia('(hover: hover)').matches : true;
 const isTypingTarget = (el) => el instanceof Element &&
   (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
-// Touch is a fallback for machines without a mouse, not a default: a stored
-// keyboard choice wins, and the first hardware key press switches a
-// misdetected touchscreen laptop back to desktop input.
-let isTouch = params.has('touch') || (() => {
-  try { if (localStorage.getItem('sbw.input') === 'keyboard') return false; } catch {}
-  return !hoverPointer && (coarsePointer || (navigator.maxTouchPoints || 0) > 0);
-})();
+// rendering budget only: a phone keeps the lower pixel ratio even though the
+// touch layout itself waits for a real finger
+const touchCapable = (navigator.maxTouchPoints || 0) > 0 ||
+  (window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false);
+// Every start is desktop, on every device. The touch layout appears only when
+// a finger really touches the screen, so nobody boots into a joystick.
+let isTouch = false;
 document.body.classList.toggle('is-touch', isTouch);
 const hasMouse = () => document.pointerLockElement === canvas || (DEBUG && !!window.__sbw?.forceInput);
 
@@ -121,7 +119,7 @@ try {
   throw e;
 }
 
-const dprCap = () => Math.min(window.devicePixelRatio || 1, isTouch ? 1.6 : 2);
+const dprCap = () => Math.min(window.devicePixelRatio || 1, touchCapable ? 1.6 : 2);
 let dpr = dprCap();
 renderer.setPixelRatio(dpr);
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1588,13 +1586,10 @@ canvas.addEventListener('pointercancel', endLook);
 
 // Switching input while the match runs: park the virtual stick and the touch
 // look, and hand the controls back to mouse and keyboard (or the other way).
-function setTouchMode(on, remember = true) {
+function setTouchMode(on) {
   if (isTouch === on) return;
   isTouch = on;
   document.body.classList.toggle('is-touch', on);
-  if (remember) {
-    try { localStorage.setItem('sbw.input', on ? 'touch' : 'keyboard'); } catch {}
-  }
   G.touchX = 0;
   G.touchY = 0;
   stickId = null;
