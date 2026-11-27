@@ -1567,6 +1567,7 @@ ui.stick?.addEventListener('pointerup', endStick);
 ui.stick?.addEventListener('pointercancel', endStick);
 
 let lookId = null, lookX = 0, lookY = 0;
+let throwAimId = null, throwAimX = 0, throwAimY = 0;
 canvas.addEventListener('pointerdown', (e) => {
   if (!isTouch || e.pointerType === 'mouse') return;
   if (!G.session || G.mode !== 'playing' || G.dead) return;
@@ -1575,14 +1576,17 @@ canvas.addEventListener('pointerdown', (e) => {
   lookY = e.clientY;
   try { canvas.setPointerCapture(e.pointerId); } catch {}
 });
+function applyLook(dx, dy) {
+  const s = 0.0034 * settings.sens;
+  G.yaw -= dx * s;
+  G.pitch = Math.max(-1.5, Math.min(1.5, G.pitch - dy * s));
+}
 canvas.addEventListener('pointermove', (e) => {
   if (e.pointerId !== lookId) return;
   const dx = e.clientX - lookX, dy = e.clientY - lookY;
   lookX = e.clientX;
   lookY = e.clientY;
-  const s = 0.0034 * settings.sens;
-  G.yaw -= dx * s;
-  G.pitch = Math.max(-1.5, Math.min(1.5, G.pitch - dy * s));
+  applyLook(dx, dy);
 });
 function endLook(e) { if (e.pointerId === lookId) lookId = null; }
 canvas.addEventListener('pointerup', endLook);
@@ -1598,6 +1602,7 @@ function setTouchMode(on) {
   G.touchY = 0;
   stickId = null;
   lookId = null;
+  throwAimId = null;
   ui.stick?.classList.remove('active');
   if (ui.stickKnob) ui.stickKnob.style.transform = '';
   if (on && document.pointerLockElement) {
@@ -1617,14 +1622,28 @@ ui.touchThrow?.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   audio.init();
   try { ui.touchThrow.setPointerCapture(e.pointerId); } catch {}
+  throwAimId = e.pointerId;
+  throwAimX = e.clientX;
+  throwAimY = e.clientY;
   beginCharge();
+});
+// The throw finger also aims: keep holding, drag to turn, release to throw.
+ui.touchThrow?.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== throwAimId) return;
+  const dx = e.clientX - throwAimX;
+  const dy = e.clientY - throwAimY;
+  throwAimX = e.clientX;
+  throwAimY = e.clientY;
+  applyLook(dx, dy);
 });
 ui.touchThrow?.addEventListener('pointerup', (e) => {
   if (!isTouch) return;
   e.preventDefault();
+  if (e.pointerId === throwAimId) throwAimId = null;
   if (G.charging) { G.charging = false; throwSnowball(); }
 });
 ui.touchThrow?.addEventListener('pointercancel', () => {
+  throwAimId = null;
   if (G.charging) {
     G.charging = false;
     G.charge = 0;
