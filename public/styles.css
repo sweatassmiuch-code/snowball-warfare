@@ -1269,7 +1269,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* =========================================================================
-   CORK7-STYLE LOBBY — resort backdrop, icon rail, player stage, mode card
+   CORK7-STYLE LOBBY — sunset backdrop, icon rail, player stage, mode card
    ========================================================================= */
 :root { --menu-display: "Anton", "Barlow Condensed", sans-serif; }
 .menu-c7 {
@@ -1282,8 +1282,8 @@ input[type="range"]::-moz-range-thumb {
   background: #0a1a26;
 }
 .menu-bg {
-  background: url("./assets/menu-resort.jpg") center 44% / cover no-repeat;
-  filter: saturate(0.9) brightness(0.94);
+  background: url("./assets/menu-sunset.png") center 44% / cover no-repeat;
+  filter: saturate(0.94) brightness(0.92);
 }
 .menu-bg::after {
   background:
