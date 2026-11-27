@@ -2207,7 +2207,7 @@ function updateHud(dt) {
     ui.chargeArc.style.strokeDashoffset = String(c);
     ui.chargeWrap.classList.toggle('full', G.charge > 0.985);
     const power = G.charge > 0.985 ? 'MAXIMALE WUCHT' : 'WUCHT ' + Math.round(G.charge * 100) + '%';
-    G.chargeLabel.textContent = power + ' · ZEITLUPE';
+    G.chargeLabel.textContent = power;
   }
   post.composite.uniforms.uFocus.value = G.focus;
 
@@ -2301,12 +2301,10 @@ function loop(fixedDt) {
   dt = Math.min(dt, 0.05);
   elapsed += dt;
 
-  // Focus freeze: while a throw is wound up the whole world holds still,
-  // then snaps back into motion the moment the ball leaves the hand.
-  const wantFocus = G.charging && !!G.session && G.mode === 'playing' && !G.dead;
-  G.focus += ((wantFocus ? 1 : 0) - G.focus) * Math.min(1, dt * (wantFocus ? 16 : 9));
-  if (G.focus < 0.002) G.focus = 0;
-  const worldDt = dt * (1 - G.focus * 0.97);
+  // Charging a throw only sets the power and the ring: the match keeps its
+  // normal speed, so aiming never freezes the fight around you.
+  G.focus = 0;
+  const worldDt = dt;
 
   if (G.session) {
     G.session.tick(worldDt);
