@@ -1,4 +1,4 @@
-# ❄ SNOWBOUND
+# ❄ SNOWDOWN
 
 Stilisierter Multiplayer-Schneeballshooter im Schneesturm.
 **Ein Treffer – und du bist raus.**
@@ -108,7 +108,7 @@ __capture(900)       // Screenshot als Data-URL
 ## Projektstruktur
 
 ```
-snowbound/
+snowdown/
 ├─ public/
 │  ├─ index.html          Menü, HUD, Pause, Death-Screen
 │  ├─ styles.css          UI-Design
