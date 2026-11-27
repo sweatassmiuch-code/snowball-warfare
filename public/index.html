@@ -120,7 +120,7 @@
         <span class="c7-card-tag c7-card-tag-new">NEU</span>
         <span class="c7-card-news-copy">
           <b>DEIN LOOK</b>
-          <span>JACKE &middot; KRAGEN &middot; M&Uuml;TZE &middot; HAUT</span>
+          <span>SCHUHE &middot; M&Uuml;TZE &middot; JACKE &middot; HANDSCHUHE</span>
           <span id="lookSummary" class="c7-look-summary">Blau &middot; Weiss &middot; Hell</span>
           <i id="lookDots" class="c7-card-dots" aria-hidden="true"></i>
         </span>
@@ -239,28 +239,44 @@
     </div>
   </div>
 
-  <div id="customize" class="c7-customize hidden" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
-    <div class="c7-customize-scrim" data-cust-close aria-hidden="true"></div>
-    <section class="c7-customize-card">
-      <header class="c7-cust-head">
-        <div>
-          <small>DEIN PLAYER</small>
-          <h2 id="customizeTitle">ANPASSEN</h2>
+  <div id="customize" class="locker hidden" role="dialog" aria-modal="true" aria-labelledby="lockerTitle">
+    <div class="locker-scrim" aria-hidden="true"></div>
+    <section class="locker-panel">
+      <header class="locker-head">
+        <div class="locker-tabs" role="tablist" aria-label="Locker">
+          <span class="locker-tab is-on" role="tab" aria-selected="true">OUTFIT</span>
         </div>
-        <button class="c7-gear" id="customizeClose" aria-label="Schliessen">&times;</button>
+        <div class="locker-head-right">
+          <span class="locker-saved">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.4a2 2 0 1 1 2.2 2c-.9.3-1.2 1-1.2 1.8M12 11.2 3.4 16.2h17.2L12 11.2Z"/></svg>
+            SAVED
+          </span>
+          <button type="button" class="locker-close" id="customizeClose" aria-label="Locker schliessen">&times;</button>
+        </div>
       </header>
-      <div class="c7-cust-tabs" id="custTabs" role="tablist" aria-label="Look-Kategorie"></div>
-      <div class="c7-cust-meta">
-        <span id="custSlotLabel">JACKE</span>
-        <b id="custPick">Blau</b>
+      <div class="locker-body">
+        <div class="locker-view" id="lockerMain">
+          <div class="locker-row-head">
+            <h2 class="locker-rider" id="lockerTitle">RIDER</h2>
+            <span class="locker-saved-pill"><i aria-hidden="true">&#10003;</i> SAVED</span>
+          </div>
+          <div class="locker-grid" id="lockerGrid"></div>
+        </div>
+        <div class="locker-view hidden" id="lockerDetail">
+          <div class="locker-detail-top">
+            <button type="button" class="locker-back" id="lockerBack"><i aria-hidden="true">&#8249;</i> LOCKER</button>
+            <span class="locker-saved-pill"><i aria-hidden="true">&#10003;</i> SAVED</span>
+          </div>
+          <h2 class="locker-title" id="lockerDetailTitle">SHOES</h2>
+          <div id="lockerDetailBody"></div>
+        </div>
       </div>
-      <div class="c7-cust-grid" id="custGrid"></div>
-      <footer class="c7-cust-foot">
-        <button class="c7-cust-ghost" id="custRandom">ZUFALL</button>
-        <button class="c7-cust-done" id="custDone">FERTIG</button>
-      </footer>
-      <p class="c7-cust-note">LIVE-VORSCHAU <span aria-hidden="true">&#8594;</span></p>
     </section>
+    <div class="locker-rotate">
+      <button type="button" class="locker-spin" id="lockerSpinL" aria-label="Vorschau nach links drehen">&#8592;</button>
+      <span>DRAG TO ROTATE</span>
+      <button type="button" class="locker-spin" id="lockerSpinR" aria-label="Vorschau nach rechts drehen">&#8594;</button>
+    </div>
   </div>
 
   <div id="loading" class="loading hidden">

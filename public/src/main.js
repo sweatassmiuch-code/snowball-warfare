@@ -6,7 +6,7 @@ import {
 import { createWorld } from './scene.js';
 import { createEffects } from './fx.js';
 import { createAudio } from './audio.js';
-import { createCharacter, makeNameTag, createViewModel, characterColor, LOOK_PALETTES } from './character.js';
+import { createCharacter, makeNameTag, createViewModel, characterColor, createLockerItem, LOOK_PALETTES } from './character.js';
 import { hostGame, joinGame } from './net.js';
 
 // ---------------------------------------------------------------------------
@@ -88,8 +88,9 @@ const ui = {
   perfChip: $('perfChip'), fpsVal: $('fpsVal'), fpsScale: $('fpsScale'),
   preview: $('preview'), lookSummary: $('lookSummary'), lookDots: $('lookDots'),
   customizeBtn: $('customizeBtn'), customize: $('customize'), customizeClose: $('customizeClose'),
-  custTabs: $('custTabs'), custGrid: $('custGrid'), custSlotLabel: $('custSlotLabel'),
-  custPick: $('custPick'), custRandom: $('custRandom'), custDone: $('custDone'),
+  lockerMain: $('lockerMain'), lockerDetail: $('lockerDetail'), lockerGrid: $('lockerGrid'),
+  lockerDetailTitle: $('lockerDetailTitle'), lockerDetailBody: $('lockerDetailBody'),
+  lockerBack: $('lockerBack'), lockerSpinL: $('lockerSpinL'), lockerSpinR: $('lockerSpinR'),
   fpsToggle: $('fpsToggle'), optionsBtn: $('optionsBtn'),
   optionsPanel: $('optionsPanel'), optionsClose: $('optionsClose'),
   eventPlay: $('eventPlay'), joinToggle: $('joinToggle'), joinPanel: $('joinPanel'),
@@ -103,7 +104,7 @@ const ui = {
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
-const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3, showFps: false, lookVersion: 2, look: { j: 0, s: 0, k: 0, h: 0 } };
+const defaults = { name: '', sens: 1, vol: 0.8, quality: 'high', bots: 3, showFps: false, lookVersion: 2, look: { j: 0, s: 0, k: 0, h: 0, b: 0, g: 0, p: 0 } };
 let settings = { ...defaults };
 try {
   settings = { ...defaults, ...JSON.parse(localStorage.getItem('sbw.settings') || '{}') };
@@ -556,108 +557,263 @@ function setLoading(on, text = 'Verbinde …') {
 
 
 // ---------------------------------------------------------------------------
-// Palette swatches + live character preview
+// Locker: category tiles on the left, the live rider on the right
 // ---------------------------------------------------------------------------
-const CUSTOM_SLOTS = [
-  { key: 'j', label: 'JACKE', list: LOOK_PALETTES.jacket, names: LOOK_PALETTES.names.jacket },
-  { key: 's', label: 'KRAGEN', list: LOOK_PALETTES.scarf, names: LOOK_PALETTES.names.scarf },
-  { key: 'h', label: 'MÜTZE', list: LOOK_PALETTES.hat, names: LOOK_PALETTES.names.hat },
-  { key: 'k', label: 'HAUT', list: LOOK_PALETTES.skin, names: LOOK_PALETTES.names.skin }
+const LOCKER_SLOTS = [
+  { key: 'b', label: 'SHOES', item: 'WINTER SNEAKER', list: LOOK_PALETTES.boots, names: LOOK_PALETTES.names.boots, icon: 'shoe' },
+  { key: 'h', label: 'HEADWEAR', item: 'BEANIE', list: LOOK_PALETTES.hat, names: LOOK_PALETTES.names.hat, icon: 'beanie' },
+  { key: 'j', label: 'JACKET', item: 'SNOW SHELL', list: LOOK_PALETTES.jacket, names: LOOK_PALETTES.names.jacket, icon: 'jacket' },
+  { key: 'g', label: 'GLOVES', item: 'SNOW MITTEN', list: LOOK_PALETTES.gloves, names: LOOK_PALETTES.names.gloves, icon: 'mitten' },
+  { key: 'p', label: 'PANTS', item: 'RIPSTOP', list: LOOK_PALETTES.pants, names: LOOK_PALETTES.names.pants, icon: 'pants' }
 ];
-let custSlotKey = 'j';
-const slotOf = (key) => CUSTOM_SLOTS.find((s) => s.key === key) || CUSTOM_SLOTS[0];
+let lockerSlotKey = null;
+const slotOf = (key) => LOCKER_SLOTS.find((s) => s.key === key) || LOCKER_SLOTS[0];
 const colorHex = (color) => '#' + new THREE.Color(color).getHexString();
+const colorShade = (color, k) => colorHex(new THREE.Color(color).multiplyScalar(k));
+const tintVars = (color) => `--i1:${colorHex(color)};--i2:${colorShade(color, 0.58)};--i3:${colorHex(new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.44))}`;
+const lookIndex = (slot) => Math.max(0, settings.look[slot.key] || 0) % slot.list.length;
+
+// Real 3D item renders for the locker tiles. One small off-screen renderer
+// serves all cards; every tile is a snapshot of the same materials the rider
+// wears, cached per item and colour.
+const lockerThumbs = (() => {
+  const LOOK_KEY = { shoe: 'b', beanie: 'h', jacket: 'j', mitten: 'g', pants: 'p' };
+  const YAW = {
+    shoe: Math.PI + 1.05,
+    beanie: Math.PI + 0.35,
+    jacket: Math.PI + 0.30,
+    mitten: Math.PI + 0.55,
+    pants: Math.PI + 0.35
+  };
+  const CAM = {
+    shoe: { p: [2.95, 1.30, 3.30], t: [0, 0.60, 0] },
+    default: { p: [2.55, 1.85, 3.35], t: [0, 0.72, 0] }
+  };
+  const cache = new Map();
+  let renderer = null, scene = null, camera = null;
+
+  function dispose(obj) {
+    obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  }
+
+  function ensure() {
+    if (renderer) return true;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'low-power'
+      });
+    } catch { renderer = null; return false; }
+    renderer.setPixelRatio(1);
+    renderer.setSize(480, 360, false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setClearColor(0x000000, 0);
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(30, 4 / 3, 0.05, 30);
+    scene.add(new THREE.HemisphereLight(0xd8ecff, 0x1a2c34, 1.5));
+    const key = new THREE.DirectionalLight(0xfff3e2, 2.6);
+    key.position.set(-2.2, 3.6, 2.8);
+    key.castShadow = true;
+    key.shadow.mapSize.set(512, 512);
+    key.shadow.camera.left = -2.5;
+    key.shadow.camera.right = 2.5;
+    key.shadow.camera.top = 3.0;
+    key.shadow.camera.bottom = -1.5;
+    key.shadow.camera.near = 0.2;
+    key.shadow.camera.far = 12;
+    key.shadow.bias = -0.0008;
+    key.shadow.normalBias = 0.02;
+    key.shadow.radius = 4;
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xa8d8ff, 2.0);
+    rim.position.set(2.8, 2.2, -2.0);
+    scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xffe0c8, 0.8);
+    fill.position.set(2.2, 0.8, 2.4);
+    scene.add(fill);
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(9, 9),
+      new THREE.ShadowMaterial({ color: 0x04121a, opacity: 0.32 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+    return true;
+  }
+
+  function thumb(kind, colorIdx) {
+    const key = `${kind}:${colorIdx}`;
+    if (cache.has(key)) return cache.get(key);
+    if (!ensure()) return '';
+    const look = { ...settings.look, [LOOK_KEY[kind]]: colorIdx };
+    const item = createLockerItem(kind, look);
+    const box = new THREE.Box3().setFromObject(item);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    item.position.sub(center);
+    const max = Math.max(size.x, size.y, size.z) || 1;
+    const inner = new THREE.Group();
+    inner.scale.setScalar(1.35 / max);
+    inner.add(item);
+    const pivot = new THREE.Group();
+    pivot.add(inner);
+    pivot.rotation.y = YAW[kind] || Math.PI;
+    scene.add(pivot);
+    pivot.updateMatrixWorld(true);
+    const worldBox = new THREE.Box3().setFromObject(pivot);
+    pivot.position.y -= worldBox.min.y;
+    pivot.updateMatrixWorld(true);
+    const cam = CAM[kind] || CAM.default;
+    camera.position.set(cam.p[0], cam.p[1], cam.p[2]);
+    camera.lookAt(cam.t[0], cam.t[1], cam.t[2]);
+    renderer.render(scene, camera);
+    const url = renderer.domElement.toDataURL('image/png');
+    scene.remove(pivot);
+    dispose(item);
+    cache.set(key, url);
+    return url;
+  }
+
+  return { thumb };
+})();
 
 function lookSummary() {
-  const j = LOOK_PALETTES.names.jacket[settings.look.j % LOOK_PALETTES.jacket.length] || 'Jacke';
-  const s = LOOK_PALETTES.names.scarf[settings.look.s % LOOK_PALETTES.scarf.length] || 'Schal';
-  const k = LOOK_PALETTES.names.skin[settings.look.k % LOOK_PALETTES.skin.length] || 'Haut';
-  return `${j} · ${s} · ${k}`;
-}
-
-// The customizer window: tab per garment slot, one large swatch per colour.
-function paintCustGrid() {
-  const slot = slotOf(custSlotKey);
-  const idx = settings.look[slot.key] % slot.list.length;
-  if (ui.custSlotLabel) ui.custSlotLabel.textContent = slot.label;
-  if (ui.custPick) ui.custPick.textContent = slot.names[idx] || '–';
-  if (ui.custTabs) {
-    for (const tab of ui.custTabs.children) tab.classList.toggle('is-on', tab.dataset.slot === slot.key);
-  }
-  if (ui.custGrid) {
-    for (const sw of ui.custGrid.children) sw.classList.toggle('is-on', Number(sw.dataset.index) === idx);
-  }
-}
-
-function renderCustGrid() {
-  if (!ui.custGrid) return;
-  const slot = slotOf(custSlotKey);
-  ui.custGrid.innerHTML = '';
-  slot.list.forEach((color, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'c7-cust-sw';
-    b.dataset.index = String(i);
-    b.style.setProperty('--sw', colorHex(color));
-    const chip = document.createElement('i');
-    const name = document.createElement('span');
-    name.textContent = slot.names[i] || String(i + 1);
-    b.append(chip, name);
-    b.addEventListener('click', () => {
-      if (settings.look[slot.key] === i) return;
-      settings.look[slot.key] = i;
-      saveSettings();
-      paintLook();
-      preview.refresh();
-    });
-    ui.custGrid.appendChild(b);
-  });
-  paintCustGrid();
+  const j = LOOK_PALETTES.names.jacket[settings.look.j % LOOK_PALETTES.jacket.length] || 'Blue';
+  const h = LOOK_PALETTES.names.hat[settings.look.h % LOOK_PALETTES.hat.length] || 'Grey';
+  const k = LOOK_PALETTES.names.skin[settings.look.k % LOOK_PALETTES.skin.length] || 'Light';
+  return `${j} · ${h} · ${k}`;
 }
 
 function paintLook() {
   if (ui.lookSummary) ui.lookSummary.textContent = lookSummary();
   if (ui.lookDots) {
     ui.lookDots.innerHTML = '';
-    for (const slot of CUSTOM_SLOTS) {
+    for (const slot of LOCKER_SLOTS) {
       const chip = document.createElement('i');
-      chip.style.background = colorHex(slot.list[settings.look[slot.key] % slot.list.length]);
+      chip.style.background = colorHex(slot.list[lookIndex(slot)]);
       ui.lookDots.appendChild(chip);
     }
   }
-  paintCustGrid();
 }
 
-function buildCustomizer() {
-  if (!ui.custTabs) return;
-  ui.custTabs.innerHTML = '';
-  for (const slot of CUSTOM_SLOTS) {
-    const tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'c7-cust-tab';
-    tab.dataset.slot = slot.key;
-    tab.setAttribute('role', 'tab');
-    tab.textContent = slot.label;
-    tab.addEventListener('click', () => {
-      custSlotKey = slot.key;
-      renderCustGrid();
-      paintCustGrid();
-    });
-    ui.custTabs.appendChild(tab);
+function lockerCard(slot) {
+  const idx = lookIndex(slot);
+  const color = slot.list[idx];
+  const name = slot.key === 'h' ? `${slot.names[idx]} BEANIE` : slot.item;
+  return `<button type="button" class="locker-card" data-slot="${slot.key}" aria-label="${slot.label}: ${name}, ${slot.names[idx]}">
+    <span class="locker-card-art"><img src="${lockerThumbs.thumb(slot.icon, idx)}" alt="" draggable="false" /></span>
+    <span class="locker-card-swat" style="background:${colorHex(color)}"></span>
+    <span class="locker-card-copy"><span class="locker-card-tag">${slot.label}</span><span class="locker-card-name">${name}</span></span>
+  </button>`;
+}
+
+function renderLockerGrid() {
+  if (!ui.lockerGrid) return;
+  ui.lockerGrid.innerHTML = LOCKER_SLOTS.map(lockerCard).join('');
+}
+
+function lockerSwatches(slot, attr = 'data-color') {
+  const idx = lookIndex(slot);
+  return slot.list.map((color, i) => `<button type="button" class="locker-sw${i === idx ? ' is-on' : ''}" ${attr}="${i}" style="--sw:${colorHex(color)}" aria-label="${slot.names[i] || String(i + 1)}" aria-pressed="${i === idx}"></button>`).join('');
+}
+
+function shopTile() {
+  return `<div class="locker-item is-shop" aria-hidden="true">
+    <span class="locker-shop-icon"><svg viewBox="0 0 24 24"><path d="M5.5 8.5h13l1 11.5h-15l1-11.5Z"/><path d="M9 8.5V6.4a3 3 0 0 1 6 0v2.1"/></svg></span>
+    <span class="locker-shop-label">MORE IN THE<br />ITEM SHOP</span>
+  </div>`;
+}
+
+function renderLockerDetail(slot) {
+  if (!slot || !ui.lockerDetailBody) return;
+  ui.lockerDetailTitle.textContent = slot.label;
+  if (slot.key === 'h') {
+    const skinSlot = { key: 'k', list: LOOK_PALETTES.skin, names: LOOK_PALETTES.names.skin };
+    const skinIdx = lookIndex(skinSlot);
+    const hatIdx = lookIndex(slot);
+    ui.lockerDetailBody.innerHTML = `
+      <div class="locker-block">
+        <div class="locker-block-head"><span>SKIN TONE</span><b>${skinSlot.names[skinIdx]}</b></div>
+        <div class="locker-swatches">${lockerSwatches(skinSlot, 'data-skin')}</div>
+      </div>
+      <div class="locker-block">
+        <div class="locker-block-head"><span>HEADWEAR</span><b>${slot.names[hatIdx]} BEANIE</b></div>
+        <div class="locker-item-grid">
+          ${slot.list.map((color, i) => `<button type="button" class="locker-item${i === hatIdx ? ' is-on' : ''}" data-hat="${i}" style="${tintVars(color)}" aria-pressed="${i === hatIdx}" aria-label="${slot.names[i]} Beanie">
+            <span class="locker-item-art"><img src="${lockerThumbs.thumb('beanie', i)}" alt="" draggable="false" /></span>
+            ${i === hatIdx ? '<span class="locker-item-check" aria-hidden="true">&#10003;</span>' : ''}
+            <span class="locker-item-copy"><small>STANDARD</small><b>${slot.names[i]} BEANIE</b><em>FREE</em></span>
+          </button>`).join('')}
+          ${shopTile()}
+        </div>
+      </div>`;
+    return;
   }
-  renderCustGrid();
+  const idx = lookIndex(slot);
+  const color = slot.list[idx];
+  ui.lockerDetailBody.innerHTML = `
+    <div class="locker-block">
+      <div class="locker-block-head"><span>ITEM</span><b>${slot.item}</b></div>
+      <div class="locker-item-grid">
+        <div class="locker-item is-on">
+          <span class="locker-item-art"><img src="${lockerThumbs.thumb(slot.icon, idx)}" alt="" draggable="false" /></span>
+          <span class="locker-item-check" aria-hidden="true">&#10003;</span>
+          <span class="locker-item-copy"><small>STANDARD</small><b>${slot.item}</b><em>FREE</em></span>
+        </div>
+        ${shopTile()}
+      </div>
+    </div>
+    <div class="locker-block">
+      <div class="locker-block-head"><span>COLOR</span><b>${slot.names[idx]}</b></div>
+      <div class="locker-swatches">${lockerSwatches(slot)}</div>
+    </div>`;
+}
+
+function openLockerSlot(key) {
+  lockerSlotKey = key;
+  if (!ui.lockerMain || !ui.lockerDetail) return;
+  ui.lockerMain.classList.add('hidden');
+  ui.lockerDetail.classList.remove('hidden');
+  renderLockerDetail(slotOf(key));
+  const body = ui.lockerDetail.parentElement;
+  if (body) body.scrollTop = 0;
+}
+
+function showLockerMain() {
+  lockerSlotKey = null;
+  if (!ui.lockerMain || !ui.lockerDetail) return;
+  ui.lockerDetail.classList.add('hidden');
+  ui.lockerMain.classList.remove('hidden');
+  renderLockerGrid();
+  paintLook();
+  const body = ui.lockerDetail.parentElement;
+  if (body) body.scrollTop = 0;
+}
+
+function applyLockerColor(key, index) {
+  if (!Number.isInteger(index)) return;
+  const lengths = { j: LOOK_PALETTES.jacket.length, h: LOOK_PALETTES.hat.length, k: LOOK_PALETTES.skin.length, b: LOOK_PALETTES.boots.length, g: LOOK_PALETTES.gloves.length, p: LOOK_PALETTES.pants.length };
+  if (!(key in lengths)) return;
+  if (settings.look[key] === index) return;
+  settings.look[key] = index % lengths[key];
+  saveSettings();
+  paintLook();
+  preview.refresh();
+  if (lockerSlotKey) renderLockerDetail(slotOf(lockerSlotKey));
 }
 
 function setCustomizer(open) {
   if (!ui.customize) return;
   ui.customize.classList.toggle('hidden', !open);
+  document.body.classList.toggle('locker-open', open);
   ui.customizeBtn?.setAttribute('aria-expanded', String(open));
-  if (!open) return;
-  custSlotKey = custSlotKey || 'j';
-  renderCustGrid();
-  paintCustGrid();
-  const tab = [...ui.custTabs.children].find((t) => t.dataset.slot === custSlotKey);
-  tab?.focus({ preventScroll: true });
+  if (!open) { lockerSlotKey = null; return; }
+  setMenuTab('look');
+  showLockerMain();
 }
 
 const preview = (() => {
@@ -826,6 +982,11 @@ const preview = (() => {
 
   return {
     refresh() { ensure(); build(); },
+    spin(step) {
+      ensure();
+      yaw += step * 0.52;
+      yawVel = 0;
+    },
     show() {
       ensure();
       if (!ch) build();
@@ -844,10 +1005,26 @@ const preview = (() => {
 
 ui.customizeBtn?.addEventListener('click', () => setCustomizer(true));
 ui.customizeClose?.addEventListener('click', () => setCustomizer(false));
-ui.custDone?.addEventListener('click', () => setCustomizer(false));
-ui.customize?.addEventListener('click', (e) => {
-  if (e.target instanceof Element && e.target.hasAttribute('data-cust-close')) setCustomizer(false);
+ui.lockerBack?.addEventListener('click', () => showLockerMain());
+ui.lockerGrid?.addEventListener('click', (e) => {
+  const card = e.target instanceof Element ? e.target.closest('[data-slot]') : null;
+  if (card instanceof HTMLElement && card.dataset.slot) openLockerSlot(card.dataset.slot);
 });
+ui.lockerDetailBody?.addEventListener('click', (e) => {
+  const target = e.target instanceof Element ? e.target : null;
+  if (!target) return;
+  const color = target.closest('[data-color]');
+  if (color instanceof HTMLElement && lockerSlotKey) {
+    applyLockerColor(lockerSlotKey, Number(color.dataset.color));
+    return;
+  }
+  const hat = target.closest('[data-hat]');
+  if (hat instanceof HTMLElement) { applyLockerColor('h', Number(hat.dataset.hat)); return; }
+  const skin = target.closest('[data-skin]');
+  if (skin instanceof HTMLElement) applyLockerColor('k', Number(skin.dataset.skin));
+});
+ui.lockerSpinL?.addEventListener('click', () => preview.spin(-1));
+ui.lockerSpinR?.addEventListener('click', () => preview.spin(1));
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (ui.infoPanel && !ui.infoPanel.classList.contains('hidden')) {
@@ -862,20 +1039,13 @@ document.addEventListener('keydown', (e) => {
   }
   if (!ui.customize || ui.customize.classList.contains('hidden')) return;
   e.stopPropagation();
+  if (lockerSlotKey) {
+    showLockerMain();
+    ui.lockerGrid?.querySelector('[data-slot]')?.focus({ preventScroll: true });
+    return;
+  }
   setCustomizer(false);
   ui.customizeBtn?.focus({ preventScroll: true });
-});
-ui.custRandom?.addEventListener('click', () => {
-  const pick = (n) => Math.floor(Math.random() * n);
-  settings.look = {
-    j: pick(LOOK_PALETTES.jacket.length),
-    s: pick(LOOK_PALETTES.scarf.length),
-    k: pick(LOOK_PALETTES.skin.length),
-    h: pick(LOOK_PALETTES.hat.length)
-  };
-  saveSettings();
-  paintLook();
-  preview.refresh();
 });
 
 function setMenuTab(name) {
@@ -889,6 +1059,8 @@ document.querySelectorAll('[data-menu-tab]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.menuTab;
     if (btn.classList.contains('c7-tab')) setMenuTab(tab);
+    // the locker is a full screen layer; any other lobby tab leaves it first
+    if (tab !== 'look') setCustomizer(false);
     if (tab === 'look') {
       closeInfo();
       ui.optionsPanel?.classList.add('hidden');
@@ -911,7 +1083,10 @@ document.querySelectorAll('[data-menu-tab]').forEach((btn) => {
   });
 });
 
-ui.optionsBtn?.addEventListener('click', () => ui.optionsPanel.classList.toggle('hidden'));
+ui.optionsBtn?.addEventListener('click', () => {
+  setCustomizer(false);
+  ui.optionsPanel.classList.toggle('hidden');
+});
 ui.optionsClose?.addEventListener('click', () => ui.optionsPanel.classList.add('hidden'));
 ui.infoClose?.addEventListener('click', closeInfo);
 ui.infoPanel?.addEventListener('click', (e) => { if (e.target === ui.infoPanel) closeInfo(); });
@@ -942,7 +1117,7 @@ ui.fpsToggle?.addEventListener('change', () => {
   ui.perfChip.classList.toggle('hidden', !settings.showFps);
 });
 
-buildCustomizer();
+renderLockerGrid();
 paintLook();
 preview.refresh();
 
@@ -950,7 +1125,7 @@ preview.refresh();
 // of sprinkling show/hide calls through the session code.
 if (ui.menu) {
   new MutationObserver(() => {
-    if (ui.menu.classList.contains('hidden')) preview.hide();
+    if (ui.menu.classList.contains('hidden')) { setCustomizer(false); preview.hide(); }
     else preview.show();
   }).observe(ui.menu, { attributes: true, attributeFilter: ['class'] });
 }

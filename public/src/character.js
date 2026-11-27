@@ -13,14 +13,23 @@ const HAIR_COLORS = [0x6d4527, 0x452c1b, 0x8b5a30, 0x2a1a11, 0xb07a45, 0x52331f]
 const IRIS_COLORS = [0x3a2a1e, 0x2d3a44, 0x3d3222, 0x2a2018, 0x4a3a28, 0x33302c];
 // Hats get their own rack: knit colours that read apart from the trim.
 const HAT_COLORS = [0x2d5cd8, 0xd0453a, 0xe0a02c, 0x2f8a63, 0x8e97a3, 0x6b46a8];
+// The locker opens up three more colour slots: the sneaker upper, the knit
+// mittens and the trouser leg. Slot 0 keeps the character's standard kit.
+const BOOT_COLORS = [0x36415f, 0x8b95a4, 0x20242c, 0xb9c3d1, 0x7c3a34, 0x2f6b57];
+const GLOVE_COLORS = [0x24272f, 0xf1f4f8, 0x2d5cd8, 0xb23a34, 0x9c8a71, 0x2f8a63];
+const PANT_COLORS = [0x2b3350, 0x8f98a4, 0x23272f, 0x5c5347, 0xa34a3f, 0x3d5a4a, 0x4b5f7d, 0x6a4a6d];
 
 export const LOOK_PALETTES = {
   jacket: JACKETS, scarf: SCARVES, hat: HAT_COLORS, skin: SKIN_TONES,
+  boots: BOOT_COLORS, gloves: GLOVE_COLORS, pants: PANT_COLORS,
   names: {
-    jacket: ['Blau', 'Rot', 'Wald', 'Violett', 'Gelb', 'Petrol', 'Pink', 'Nacht'],
-    scarf: ['Weiss', 'Creme', 'Eis', 'Mint', 'Rose', 'Grau'],
-    hat: ['Blau', 'Rot', 'Gelb', 'Gruen', 'Grau', 'Violett'],
-    skin: ['Hell', 'Warm', 'Braun', 'Dunkel', 'Tief', 'Creme']
+    jacket: ['Blue', 'Red', 'Forest', 'Purple', 'Gold', 'Teal', 'Pink', 'Night'],
+    scarf: ['White', 'Cream', 'Ice', 'Mint', 'Rose', 'Grey'],
+    hat: ['Blue', 'Red', 'Gold', 'Green', 'Grey', 'Purple'],
+    skin: ['Light', 'Warm', 'Tan', 'Brown', 'Deep', 'Cream'],
+    boots: ['Navy', 'Steel', 'Onyx', 'Glacier', 'Cherry', 'Pine'],
+    gloves: ['Black', 'White', 'Blue', 'Red', 'Sand', 'Forest'],
+    pants: ['Navy', 'Grey', 'Black', 'Brown', 'Red', 'Forest', 'Denim', 'Plum']
   }
 };
 
@@ -678,12 +687,19 @@ function materialsFor(idx, look) {
   const s = look && Number.isInteger(look.s) ? look.s : idx;
   const k = look && Number.isInteger(look.k) ? look.k : idx;
   const h = look && Number.isInteger(look.h) ? look.h : idx;
-  const key = `${j % JACKETS.length}:${s % SCARVES.length}:${k % SKIN_TONES.length}:${h % HAIR_COLORS.length}`;
+  // newer slots fall back to the standard kit, so old looks and bots stay valid
+  const bt = look && Number.isInteger(look.b) ? look.b : 0;
+  const gl = look && Number.isInteger(look.g) ? look.g : 0;
+  const pt = look && Number.isInteger(look.p) ? look.p : 0;
+  const key = `${j % JACKETS.length}:${s % SCARVES.length}:${k % SKIN_TONES.length}:${h % HAIR_COLORS.length}:${bt % BOOT_COLORS.length}:${gl % GLOVE_COLORS.length}:${pt % PANT_COLORS.length}`;
   if (matCache.has(key)) return matCache.get(key);
   const jacketColor = JACKETS[j % JACKETS.length];
   const scarfColor = SCARVES[s % SCARVES.length];
   const skinColor = SKIN_TONES[k % SKIN_TONES.length];
   const hairColor = HAIR_COLORS[h % HAIR_COLORS.length];
+  const bootColor = BOOT_COLORS[bt % BOOT_COLORS.length];
+  const gloveColor = GLOVE_COLORS[gl % GLOVE_COLORS.length];
+  const pantsColor = PANT_COLORS[pt % PANT_COLORS.length];
 
   const m = {
     jacket: new THREE.MeshPhysicalMaterial({
@@ -709,8 +725,8 @@ function materialsFor(idx, look) {
       sheen: 0.2, sheenRoughness: 0.9, envMapIntensity: 0.34
     }),
     pants: new THREE.MeshStandardMaterial({
-      color: 0x2b3350, roughness: 0.92, metalness: 0,
-      emissive: new THREE.Color(0x2b3350).multiplyScalar(0.10),
+      color: pantsColor, roughness: 0.92, metalness: 0,
+      emissive: new THREE.Color(pantsColor).multiplyScalar(0.10),
       normalMap: denimNormal(), normalScale: new THREE.Vector2(0.18, 0.18), envMapIntensity: 0.3
     }),
     scarf: new THREE.MeshPhysicalMaterial({
@@ -789,8 +805,8 @@ function materialsFor(idx, look) {
     // Smooth knitted mittens: no leather normal map, so the small hand does
     // not read as a cracked stone at menu distance.
     mitten: new THREE.MeshPhysicalMaterial({
-      color: 0x24272f, roughness: 0.74, metalness: 0,
-      sheen: 0.34, sheenRoughness: 0.55, sheenColor: new THREE.Color(0x7b8598), envMapIntensity: 0.8
+      color: gloveColor, roughness: 0.74, metalness: 0,
+      sheen: 0.34, sheenRoughness: 0.55, sheenColor: new THREE.Color(gloveColor).lerp(new THREE.Color(0xdfe7f2), 0.5), envMapIntensity: 0.8
     }),
     leather: new THREE.MeshPhysicalMaterial({
       color: 0x1d2126, roughness: 0.58, metalness: 0.04,
@@ -798,13 +814,14 @@ function materialsFor(idx, look) {
       clearcoat: 0.35, clearcoatRoughness: 0.55, envMapIntensity: 0.9
     }),
     boot: new THREE.MeshPhysicalMaterial({
-      color: 0x36415f, roughness: 0.88, metalness: 0.02,
+      color: bootColor, roughness: 0.88, metalness: 0.02,
       normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.26, 0.26),
       clearcoat: 0, clearcoatRoughness: 0.8, envMapIntensity: 0.35
     }),
-    // the reference sneaker's light steel-blue toe box
+    // the sneaker's light toe box follows the chosen upper colour
     bootToe: new THREE.MeshPhysicalMaterial({
-      color: 0x8299b3, roughness: 0.62, metalness: 0.02, side: THREE.DoubleSide,
+      color: new THREE.Color(bootColor).lerp(new THREE.Color(0xdfe9f5), 0.46),
+      roughness: 0.62, metalness: 0.02, side: THREE.DoubleSide,
       normalMap: leatherNormal(), normalScale: new THREE.Vector2(0.2, 0.2),
       clearcoat: 0.10, clearcoatRoughness: 0.7, envMapIntensity: 0.8
     }),
@@ -1154,6 +1171,389 @@ const legRadius = (t) => {
 };
 
 // ---------------------------------------------------------------------------
+// Locker preview items
+// ---------------------------------------------------------------------------
+// A shoe has to be one continuous upper over a real sole. The old boot was a
+// bent vertical tube with a separate toe shell stuck on the front, which read
+// as two objects. This upper is a foot-shaped loft along Z: heel, instep and
+// toe are the same surface, and the light toe box is only a material split.
+const SHOE_BASE_Y = -0.096;
+const SHOE_SECTIONS = [
+  // [z, half width, height above the sole]
+  [0.090, 0.030, 0.075], [0.082, 0.052, 0.108], [0.066, 0.064, 0.128],
+  [0.042, 0.072, 0.136], [0.014, 0.075, 0.116], [-0.022, 0.076, 0.096],
+  [-0.058, 0.076, 0.082], [-0.092, 0.074, 0.072], [-0.126, 0.071, 0.062],
+  [-0.156, 0.065, 0.052], [-0.182, 0.056, 0.044], [-0.202, 0.042, 0.036],
+  [-0.215, 0.024, 0.026], [-0.221, 0.008, 0.014]
+];
+const SHOE_TOE_FROM = 7;
+
+function shoeUpperGeometry(radial = 30) {
+  const pos = [], uvs = [], idx = [];
+  const sections = SHOE_SECTIONS;
+  const n = sections.length;
+  for (let i = 0; i < n; i++) {
+    const [z, w, h] = sections[i];
+    const cy = SHOE_BASE_Y + h * 0.5;
+    const ry = h * 0.5;
+    for (let j = 0; j < radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      const c = Math.cos(a), s = Math.sin(a);
+      // A slightly squared section instead of an egg: the top of the foot is
+      // flatter and the sides stand up like a real upper.
+      const sx = Math.sign(c) * Math.pow(Math.abs(c), 0.72) * w;
+      const sy = Math.sign(s) * Math.pow(Math.abs(s), 0.72) * ry;
+      pos.push(sx, cy + sy, z);
+      uvs.push(j / radial, i / (n - 1));
+    }
+  }
+  for (let i = 0; i < n - 1; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * radial + j, b = a + radial;
+      const an = i * radial + ((j + 1) % radial), bn = b - j + ((j + 1) % radial);
+      idx.push(a, b, an, b, bn, an);
+    }
+  }
+  const sideCount = idx.length;
+  const bootSide = SHOE_TOE_FROM * radial * 6;
+  const cap = (ring, front) => {
+    const [z, , h] = sections[ring];
+    const cy = SHOE_BASE_Y + h * 0.5;
+    const center = pos.length / 3;
+    pos.push(0, cy, z); uvs.push(0.5, ring / (n - 1));
+    for (let j = 0; j < radial; j++) {
+      const a = ring * radial + j, b = ring * radial + ((j + 1) % radial);
+      if (front) idx.push(center, b, a); else idx.push(center, a, b);
+    }
+    return idx.length - sideCount;
+  };
+  const heelStart = idx.length;
+  const heelCount = cap(0, false);
+  const toeStart = idx.length;
+  const toeCount = cap(n - 1, true);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  geo.addGroup(0, bootSide, 0);
+  geo.addGroup(bootSide, sideCount - bootSide, 1);
+  geo.addGroup(heelStart, heelCount, 0);
+  geo.addGroup(toeStart, toeCount, 1);
+  return geo;
+}
+
+// A sole as an extruded footprint, with a toe spring so the sneaker rolls off
+// instead of standing on a flat slab.
+function bootSoleGeometry(depth = 0.020, bevel = 0.010) {
+  const s = new THREE.Shape();
+  s.moveTo(-0.060, 0.092);
+  s.quadraticCurveTo(-0.076, 0.084, -0.079, 0.048);
+  s.quadraticCurveTo(-0.081, -0.005, -0.079, -0.048);
+  s.quadraticCurveTo(-0.075, -0.110, -0.060, -0.162);
+  s.quadraticCurveTo(-0.042, -0.205, 0, -0.228);
+  s.quadraticCurveTo(0.042, -0.205, 0.060, -0.162);
+  s.quadraticCurveTo(0.075, -0.110, 0.079, -0.048);
+  s.quadraticCurveTo(0.081, -0.005, 0.079, 0.048);
+  s.quadraticCurveTo(0.076, 0.084, 0.060, 0.092);
+  s.quadraticCurveTo(0, 0.098, -0.060, 0.092);
+  const geo = new THREE.ExtrudeGeometry(s, {
+    depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel,
+    bevelSegments: 4, curveSegments: 16
+  });
+  geo.rotateX(Math.PI / 2);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const z = p.getZ(i);
+          if (z < -0.155) {
+        const t = Math.min(1, (-z - 0.155) / 0.073);
+        p.setY(i, p.getY(i) + t * t * 0.010);
+      }
+  }
+  p.needsUpdate = true;
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function buildSneaker(m) {
+  const group = new THREE.Group();
+  group.name = 'sneaker';
+
+  const upper = new THREE.Mesh(shoeUpperGeometry(30), [m.boot, m.bootToe]);
+  upper.castShadow = true; upper.receiveShadow = true;
+  group.add(upper);
+
+  // padded tongue under the laces, slightly lighter than the upper
+  const tongue = add(group, new THREE.CapsuleGeometry(0.026, 0.060, 4, 12), m.bootToe,
+    [0, 0.012, -0.055], [Math.PI / 2 - 0.10, 0, 0], [1.18, 1.0, 0.42]);
+  tongue.castShadow = false;
+
+  // short padded high-top collar in the shoe colour, so a dark sneaker does not
+  // grow a white sock above the ankle. The trouser cuff drops over most of it.
+  const collarParts = [
+    { geo: new THREE.CylinderGeometry(0.0615, 0.0665, 0.055, 24), pos: [0, 0.0535, 0.028], scale: [1, 1, 0.94] },
+    { geo: new THREE.TorusGeometry(0.0660, 0.0050, 8, 24), pos: [0, 0.028, 0.028], rot: [Math.PI / 2, 0, 0], scale: [1, 1, 0.94] }
+  ];
+  const collar = new THREE.Mesh(mergeParts(collarParts), m.boot);
+  collar.castShadow = false; collar.receiveShadow = true;
+  group.add(collar);
+  const trimParts = [
+    // light padded rim at the top of the collar
+    { geo: new THREE.TorusGeometry(0.0605, 0.0080, 8, 24), pos: [0, 0.080, 0.028], rot: [Math.PI / 2, 0, 0], scale: [1, 1, 0.94] }
+  ];
+  // laces across the instep, sitting on the vamp instead of inside it
+  const laceY = [0.009, 0.000, -0.009, -0.018];
+  const laceZ = [-0.028, -0.052, -0.076, -0.100];
+  for (let i = 0; i < 4; i++) {
+    trimParts.push({
+      geo: new THREE.CylinderGeometry(0.0036, 0.0036, 0.058, 7),
+      pos: [0, laceY[i], laceZ[i]], rot: [0, 0, Math.PI / 2]
+    });
+  }
+  // heel pull tab on the back of the collar
+  trimParts.push({ geo: new THREE.BoxGeometry(0.020, 0.030, 0.007), pos: [0, 0.078, 0.086] });
+  const trim = new THREE.Mesh(mergeParts(trimParts), m.scarf);
+  trim.castShadow = false; trim.receiveShadow = true;
+  group.add(trim);
+  // dark opening inside the collar: without it the padded rim reads as the
+  // closed top of a bucket instead of the mouth of the shoe
+  add(group, new THREE.CylinderGeometry(0.050, 0.050, 0.002, 20), m.rubber,
+    [0, 0.0805, 0.028], [0, 0, 0], [1, 1, 0.94]);
+
+  const midsole = new THREE.Mesh(bootSoleGeometry(), m.sole);
+  midsole.position.y = -0.100;
+  midsole.castShadow = true; midsole.receiveShadow = true;
+  group.add(midsole);
+  const outsole = new THREE.Mesh(bootSoleGeometry(0.008, 0.0025), m.rubber);
+  outsole.position.y = -0.130;
+  outsole.scale.set(0.992, 1, 0.992);
+  outsole.castShadow = false; outsole.receiveShadow = true;
+  group.add(outsole);
+  return group;
+}
+
+// ---- 3D locker thumbnails ------------------------------------------------
+// These are the same materials as the rider, built as free-standing items for
+// the locker tiles. The small preview is a real render, not a drawing.
+function buildBeanieItem(m) {
+  const group = new THREE.Group();
+  const hatRings = [
+    [0.0172, 0.0040, 0.1030, 0.1068], [0.0196, 0.0040, 0.1082, 0.1122],
+    [0.0230, 0.0040, 0.1106, 0.1148], [0.0320, 0.0042, 0.1116, 0.1158],
+    [0.0420, 0.0046, 0.1116, 0.1158], [0.0520, 0.0050, 0.1110, 0.1150],
+    [0.0610, 0.0056, 0.1096, 0.1136], [0.0700, 0.0070, 0.1070, 0.1108],
+    [0.0810, 0.0090, 0.1036, 0.1072], [0.0920, 0.0115, 0.0986, 0.1022],
+    [0.1030, 0.0145, 0.0920, 0.0954], [0.1130, 0.0180, 0.0834, 0.0866],
+    [0.1220, 0.0220, 0.0726, 0.0754], [0.1290, 0.0260, 0.0620, 0.0644],
+    [0.1345, 0.0300, 0.0500, 0.0520], [0.1390, 0.0335, 0.0360, 0.0374],
+    [0.1420, 0.0360, 0.0200, 0.0208], [0.1432, 0.0375, 0.0008, 0.0008]
+  ];
+  const beanie = add(group, ringLoft(hatRings, 44), m.beanie, [0, 0, 0]);
+  beanie.castShadow = true;
+  add(group, loftGeometry([
+    [0.0600, 0.1100, 0.1140], [0.0622, 0.1104, 0.1144], [0.0646, 0.1092, 0.1132]
+  ], 44), m.beanieDark, [0, 0, 0.0052]);
+  const hatLogo = new THREE.Mesh(
+    bendPatch(mountainLogoGeometry(0.056, 0.032), 0, 0.1108, 0.1148, -0.46, 0.0030, 0.0045),
+    m.logo
+  );
+  hatLogo.position.y = 0.0195;
+  hatLogo.castShadow = false;
+  group.add(hatLogo);
+
+  const pomGeo = new THREE.IcosahedronGeometry(0.0365, 3);
+  const p = pomGeo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.set(p.getX(i), p.getY(i), p.getZ(i));
+    const n = fbm2(v.x * 60 + 3, v.y * 60 + 11, 3) * 0.6 + fbm2(v.z * 95 + 7, v.x * 95 + 19, 2) * 0.4;
+    v.multiplyScalar(1 + (n - 0.5) * 0.26);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  pomGeo.computeVertexNormals();
+  pomGeo.computeBoundingSphere();
+  const pom = add(group, pomGeo, m.scarf, [0, 0.1615, 0.0420], [0.15, 0, 0.1], [1.02, 0.98, 1.02]);
+  pom.castShadow = true;
+  group.scale.setScalar(1.74);
+  return group;
+}
+
+function buildJacketItem(m) {
+  const group = new THREE.Group();
+  const jacketSections = [
+    [-0.132, 0.209, 0.161], [-0.104, 0.208, 0.160], [-0.060, 0.205, 0.158],
+    [0.000, 0.202, 0.155], [0.070, 0.203, 0.156], [0.150, 0.207, 0.159],
+    [0.235, 0.213, 0.162], [0.315, 0.220, 0.165], [0.390, 0.227, 0.169],
+    [0.435, 0.224, 0.167], [0.470, 0.211, 0.159], [0.500, 0.188, 0.149],
+    [0.528, 0.158, 0.133], [0.552, 0.124, 0.116], [0.570, 0.104, 0.105]
+  ];
+  const jacketAt = (y) => {
+    if (y <= jacketSections[0][0]) return [jacketSections[0][1], jacketSections[0][2]];
+    for (let k = 1; k < jacketSections.length; k++) {
+      const a = jacketSections[k - 1], b = jacketSections[k];
+      if (y <= b[0]) {
+        const t = (y - a[0]) / (b[0] - a[0] || 1);
+        return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+      }
+    }
+    const last = jacketSections[jacketSections.length - 1];
+    return [last[1], last[2]];
+  };
+  const QUILT_PERIOD = 0.152, QUILT_OFFSET = -0.052;
+  const quiltAt = (y) => {
+    const t = (y + 0.132) / 0.702;
+    const env = Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, t)))), 0.18);
+    const w = Math.abs(Math.sin(((y - QUILT_OFFSET) / QUILT_PERIOD) * Math.PI));
+    const puffed = Math.pow(w, 0.62);
+    return (0.0082 * puffed - 0.0022 * (1 - puffed)) * env;
+  };
+  const quiltedSections = [];
+  for (let i = 0; i < 68; i++) {
+    const y = -0.132 + 0.702 * (i / 67);
+    const base = jacketAt(y);
+    const q = quiltAt(y);
+    quiltedSections.push([y, base[0] + q, base[1] + q]);
+  }
+  const torso = add(group, loftGeometry(quiltedSections, 36), m.jacket, [0, 0, 0]);
+  torso.castShadow = true;
+  for (const y of [-0.052, 0.100, 0.252, 0.404]) {
+    const base = jacketAt(y);
+    const q = quiltAt(y);
+    add(group, loftGeometry([
+      [y - 0.0016, base[0] + q + 0.0002, base[1] + q + 0.0002],
+      [y, base[0] + q + 0.0010, base[1] + q + 0.0010],
+      [y + 0.0016, base[0] + q + 0.0002, base[1] + q + 0.0002]
+    ], 36), m.seam, [0, 0, 0]);
+  }
+  add(group, loftGeometry([
+    [-0.136, 0.212, 0.164], [-0.118, 0.213, 0.165], [-0.098, 0.208, 0.160]
+  ], 36), m.jacketDark);
+
+  const zipPts = [];
+  for (let i = 0; i <= 30; i++) {
+    const y = -0.124 + (0.508 + 0.124) * (i / 30);
+    const d = jacketAt(y)[1] + quiltAt(y);
+    zipPts.push(new THREE.Vector3(0, y, -(d + 0.0026)));
+  }
+  add(group, ribbonGeometry(zipPts, 0.0060), m.scarf);
+  add(group, ribbonGeometry(zipPts.map((p) => new THREE.Vector3(p.x, p.y, p.z - 0.0008)), 0.0021), m.jacketDark);
+  const zipTop = zipPts[zipPts.length - 1];
+  add(group, new THREE.BoxGeometry(0.014, 0.021, 0.007), m.sole,
+    [0, zipTop.y - 0.018, zipTop.z - 0.003]);
+  add(group, new THREE.CapsuleGeometry(0.0042, 0.019, 3, 8), m.sole,
+    [0, zipTop.y - 0.038, zipTop.z - 0.005]);
+
+  const collarSections = [
+    [0.502, 0.193, 0.155], [0.516, 0.181, 0.147], [0.530, 0.164, 0.136],
+    [0.544, 0.148, 0.124], [0.556, 0.128, 0.112], [0.568, 0.106, 0.100]
+  ];
+  const collar = add(group, loftGeometry(collarSections, 30), m.scarf, [0, 0, 0]);
+  collar.castShadow = true;
+  add(group, new THREE.SphereGeometry(1, 24, 16), m.jacket,
+    [0, 0.520, 0.142], [-0.24, 0, 0], [0.156, 0.098, 0.112]);
+
+  for (const side of [-1, 1]) {
+    const cord = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(side * 0.055, 0.546, -0.112),
+      new THREE.Vector3(side * 0.070, 0.518, -0.160),
+      new THREE.Vector3(side * 0.078, 0.478, -0.177),
+      new THREE.Vector3(side * 0.075, 0.438, -0.182)
+    ]);
+    add(group, new THREE.TubeGeometry(cord, 18, 0.0042, 9, false), m.scarf);
+    add(group, new THREE.CylinderGeometry(0.0104, 0.0092, 0.031, 14), m.scarf,
+      [side * 0.077, 0.492, -0.172], [0.12, 0, side * 0.05]);
+  }
+
+  const chestLogo = new THREE.Mesh(
+    bendPatch(mountainLogoGeometry(0.068, 0.042), 0, jacketAt(0.318)[0],
+      jacketAt(0.318)[1] + quiltAt(0.318) + 0.0020, -0.42, 0.0030),
+    m.logo
+  );
+  chestLogo.position.y = 0.318;
+  chestLogo.castShadow = false;
+  group.add(chestLogo);
+
+  // static sleeves for the product shot (the rider's are skinned)
+  for (const side of [-1, 1]) {
+    const sleeve = new THREE.Group();
+    sleeve.position.set(side * 0.209, 0.402, 0);
+    sleeve.rotation.z = side * 0.12;
+    group.add(sleeve);
+    const arm = new THREE.Mesh(
+      limbGeometry(0, 0, 0, 0.30, 0.30, sleeveProfile, { rings: 48, radial: 20, blend: 0.075 }),
+      m.jacket
+    );
+    arm.castShadow = true; arm.receiveShadow = true;
+    sleeve.add(arm);
+    add(sleeve, new THREE.SphereGeometry(1, 22, 16), m.jacket,
+      [side * 0.004, -0.055, 0], [0, 0, side * -0.08], [0.079, 0.087, 0.076]);
+    add(sleeve, new THREE.CylinderGeometry(0.0655, 0.0690, 0.064, 22), m.scarf, [0, -0.572, 0]);
+    add(sleeve, new THREE.TorusGeometry(0.0658, 0.0048, 8, 24), m.scarf,
+      [0, -0.540, 0], [Math.PI / 2, 0, 0]);
+    add(sleeve, new THREE.TorusGeometry(0.0692, 0.0046, 8, 24), m.scarf,
+      [0, -0.604, 0], [Math.PI / 2, 0, 0]);
+  }
+  return group;
+}
+
+function buildMittenItem(m) {
+  const group = new THREE.Group();
+  add(group, new THREE.CylinderGeometry(0.066, 0.069, 0.070, 22), m.scarf, [0, 0.120, 0]);
+  add(group, new THREE.TorusGeometry(0.0658, 0.0048, 8, 24), m.scarf,
+    [0, 0.152, 0], [Math.PI / 2, 0, 0]);
+  add(group, new THREE.TorusGeometry(0.0692, 0.0046, 8, 24), m.scarf,
+    [0, 0.088, 0], [Math.PI / 2, 0, 0]);
+  const hand = new THREE.Group();
+  hand.position.y = 0.060;
+  group.add(hand);
+  const palm = add(hand, new THREE.CapsuleGeometry(0.056, 0.056, 10, 24), m.mitten,
+    [0, -0.056, -0.006], [0.06, 0, 0], [1.03, 1.04, 0.92]);
+  palm.castShadow = true;
+  const thumb = add(hand, new THREE.CapsuleGeometry(0.024, 0.044, 8, 18), m.mitten,
+    [-0.040, -0.050, -0.014], [0.32, 0, 0.95], [1, 1, 0.96]);
+  thumb.castShadow = true;
+  return group;
+}
+
+function buildPantsItem(m) {
+  const group = new THREE.Group();
+  const pantsProfile = (t) => {
+    if (t < 0.10) return 0.083 + t * 0.135;
+    if (t < 0.42) return 0.1030 - (t - 0.10) * 0.046;
+    if (t < 0.58) return 0.0883 - (t - 0.42) * 0.021;
+    if (t < 0.88) return 0.0849 - (t - 0.58) * 0.030;
+    return 0.0759 - (t - 0.88) * 0.072;
+  };
+  const pelvis = add(group, loftGeometry([
+    [0.170, 0.175, 0.115], [0.130, 0.190, 0.120], [0.070, 0.205, 0.125],
+    [0.010, 0.195, 0.118], [-0.040, 0.165, 0.105]
+  ], 30), m.pants);
+  pelvis.castShadow = true;
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Mesh(
+      limbGeometry(side * 0.105, 0.020, 0, 0.440, 0.420, pantsProfile, { rings: 30, radial: 18 }),
+      m.pants
+    );
+    leg.castShadow = true; leg.receiveShadow = true;
+    group.add(leg);
+  }
+  return group;
+}
+
+export function createLockerItem(kind, look) {
+  const m = materialsFor(0, look);
+  if (kind === 'shoe') return buildSneaker(m);
+  if (kind === 'beanie') return buildBeanieItem(m);
+  if (kind === 'jacket') return buildJacketItem(m);
+  if (kind === 'mitten') return buildMittenItem(m);
+  if (kind === 'pants') return buildPantsItem(m);
+  return new THREE.Group();
+}
+
+// ---------------------------------------------------------------------------
 // Character
 // ---------------------------------------------------------------------------
 export function createCharacter(colorIdx, look) {
@@ -1442,41 +1842,6 @@ export function createCharacter(colorIdx, look) {
   const armL = makeArm(-1);
 
   // ---- legs -------------------------------------------------------------
-  // A boot sole as a real extruded footprint: flat on the snow, rounded edges
-  // and a little wider than the upper. The old ring read as a white stripe.
-  function soleGeometry(depth = 0.020, bevel = 0.010) {
-    const s = new THREE.Shape();
-    const hw = 0.078;
-    s.moveTo(-hw * 0.70, 0.064);
-    s.quadraticCurveTo(-hw, 0.056, -hw, 0.014);
-    s.quadraticCurveTo(-hw - 0.001, -0.024, -hw * 0.92, -0.062);
-    s.quadraticCurveTo(-0.058, -0.116, -0.044, -0.144);
-    s.quadraticCurveTo(0, -0.162, 0.044, -0.144);
-    s.quadraticCurveTo(0.058, -0.116, hw * 0.92, -0.062);
-    s.quadraticCurveTo(hw + 0.001, -0.024, hw, 0.014);
-    s.quadraticCurveTo(hw, 0.056, hw * 0.70, 0.064);
-    s.quadraticCurveTo(0, 0.074, -hw * 0.70, 0.064);
-    const geo = new THREE.ExtrudeGeometry(s, {
-      depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel,
-      bevelSegments: 4, curveSegments: 16
-    });
-    geo.rotateX(Math.PI / 2);
-    // A little toe spring: a completely flat slab reads as a skateboard, the
-    // lifted front edge lets the sneaker roll off instead of clomping.
-    const p = geo.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const z = p.getZ(i);
-      if (z < -0.095) {
-        const t = Math.min(1, (-z - 0.095) / 0.067);
-        p.setY(i, p.getY(i) + t * t * 0.007);
-      }
-    }
-    p.needsUpdate = true;
-    geo.computeVertexNormals();
-    geo.computeBoundingSphere();
-    return geo;
-  }
-
   // one trouser leg over a hip and a knee bone: the knee folds smoothly instead
   // of showing the seam between two separate tubes
   const legProfile = (t) => {
@@ -1495,79 +1860,21 @@ export function createCharacter(colorIdx, look) {
     knee.position.y = -0.375;
     hip.add(knee);
 
-    // The trouser leg stops inside the boot cuff. Letting the skinned tube run
-    // all the way to the ankle swallowed the whole sneaker, so only the shaft
-    // below the cuff was visible and the shoe read as a sock.
-    const legGeo = limbGeometry(0, 0, 0, 0.375, 0.140, legProfile, { rings: 30, radial: 18, blend: 0.055 });
+    // The trouser leg runs down over the short sneaker collar. It used to stop
+    // high above the foot, which left a bare gap and forced a tall boot shaft.
+    const legGeo = limbGeometry(0, 0, 0, 0.375, 0.214, legProfile, { rings: 34, radial: 18, blend: 0.055 });
     const legMesh = new THREE.SkinnedMesh(legGeo, m.pants);
     legMesh.castShadow = true; legMesh.receiveShadow = true;
     hip.add(legMesh);
     root.updateMatrixWorld(true);
     legMesh.bind(new THREE.Skeleton([hip, knee]), legMesh.matrixWorld.clone());
 
-    // Winter sneaker: high navy shaft, a light steel-blue toe box and tongue,
-    // white laces, a padded white cuff and a two-layer sole. The old boot was
-    // one bulbous loft on a flat white slab, with a sock band for an ankle.
+    // One continuous sneaker: foot-shaped upper, light toe box, padded collar,
+    // laces and a two-layer sole. The same builder feeds the locker thumbnail.
     const foot = new THREE.Group();
     foot.position.y = -0.300;
     knee.add(foot);
-    const bootRings = [
-      [0.132, 0.000, 0.062, 0.060], [0.108, 0.000, 0.066, 0.064],
-      [0.080, 0.000, 0.070, 0.070], [0.048, -0.002, 0.073, 0.077],
-      [0.014, -0.008, 0.075, 0.085], [-0.020, -0.018, 0.076, 0.091],
-      [-0.048, -0.034, 0.074, 0.097], [-0.072, -0.054, 0.069, 0.099],
-      [-0.092, -0.076, 0.060, 0.092], [-0.105, -0.094, 0.049, 0.079],
-      [-0.112, -0.106, 0.038, 0.060]
-    ];
-    // The tongue shares the navy upper material, so the white laces sit on
-    // cloth instead of on a bright blue plaque; merging it into the shaft
-    // also keeps it at zero extra draw calls.
-    const boot = new THREE.Mesh(mergeParts([
-      { geo: ringLoft(bootRings, 26) },
-      { geo: new THREE.CapsuleGeometry(0.023, 0.062, 4, 12),
-        pos: [0, 0.100, -0.083], rot: [-0.20, 0, 0], scale: [1.05, 1.08, 0.30] }
-    ]), m.boot);
-    boot.castShadow = true; boot.receiveShadow = true;
-    foot.add(boot);
-
-    // light-blue toe box: a cap over the lower front only, so the navy upper
-    // keeps the height of the shoe instead of turning into a blue blob
-    const toe = add(foot, ringLoftArc([
-      [-0.060, -0.042, 0.0728, 0.0991], [-0.075, -0.058, 0.0665, 0.0998],
-      [-0.092, -0.076, 0.0608, 0.0930], [-0.105, -0.094, 0.0498, 0.0800],
-      [-0.112, -0.106, 0.0388, 0.0610]
-    ], 22, -Math.PI / 2 - 1.02, -Math.PI / 2 + 1.02), m.bootToe, [0, 0, 0]);
-    toe.castShadow = false;
-
-    // padded white cuff with a rounded lip instead of the old flat sock band
-    const trimParts = [
-      { geo: new THREE.CylinderGeometry(0.0735, 0.0705, 0.052, 24), pos: [0, 0.143, 0.000] },
-      { geo: new THREE.TorusGeometry(0.0695, 0.0105, 8, 24), pos: [0, 0.169, 0.000], rot: [Math.PI / 2, 0, 0] },
-      { geo: new THREE.TorusGeometry(0.0715, 0.0065, 8, 24), pos: [0, 0.118, 0.000], rot: [Math.PI / 2, 0, 0] }
-    ];
-
-    // laces give the shoe a real front instead of a smooth blob; the tongue
-    // is merged into the navy shaft above, so it costs no extra draw call
-    for (let i = 0; i < 3; i++) {
-      trimParts.push({
-        geo: new THREE.CylinderGeometry(0.0028, 0.0028, 0.044, 7),
-        pos: [0, 0.106 - i * 0.023, -0.0945], rot: [0, 0, Math.PI / 2]
-      });
-    }
-    const trim = new THREE.Mesh(mergeParts(trimParts), m.scarf);
-    trim.castShadow = false; trim.receiveShadow = true;
-    foot.add(trim);
-
-    // white midsole over a dark rubber outsole
-    const midsole = new THREE.Mesh(soleGeometry(), m.sole);
-    midsole.position.y = -0.102;
-    midsole.castShadow = true; midsole.receiveShadow = true;
-    foot.add(midsole);
-    const outsole = new THREE.Mesh(soleGeometry(0.008, 0.003), m.rubber);
-    outsole.position.y = -0.132;
-    outsole.scale.set(0.992, 1, 0.992);
-    outsole.castShadow = false; outsole.receiveShadow = true;
-    foot.add(outsole);
+    foot.add(buildSneaker(m));
     return { hip, knee, foot };
   }
   const legR = makeLeg(1);
