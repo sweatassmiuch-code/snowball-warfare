@@ -514,7 +514,7 @@ ui.menuBtn.addEventListener('click', () => {
   if (document.pointerLockElement) document.exitPointerLock();
   else openPause();
 });
-ui.leaveBtn.addEventListener('click', leaveGame);
+ui.leaveBtn.addEventListener('click', () => leaveGame());
 ui.resumeBtn.addEventListener('click', resumeGame);
 
 function setMenuStatus(text, cls = '') {
@@ -999,8 +999,7 @@ ui.joinBtn.addEventListener('click', async () => {
         showToast(msg);
       },
       onClosed: (msg) => {
-        showToast(msg);
-        leaveGame(true);
+        leaveGame(msg);
       },
       onReady: (info) => {
         G.selfId = info.id;
@@ -1354,13 +1353,86 @@ canvas.addEventListener('click', () => {
   }
 });
 
-function leaveGame(silent = false) {
+// Back to the lobby without a page reload. A reload here meant a black flash
+// and a fresh PeerJS handshake every time someone quit; clearing the match in
+// place is immediate and the menu preview is already running.
+function leaveGame(message = '') {
+  // Set the mode first: leaving pointer lock fires pointerlockchange, and that
+  // handler would otherwise reopen the pause card behind the menu.
+  G.mode = 'menu';
   try { if (document.pointerLockElement) document.exitPointerLock(); } catch {}
-  G.session?.close();
+
+  const session = G.session;
   G.session = null;
-  if (!silent) {
-    location.reload();
-  }
+  try { session?.close(); } catch {}
+
+  G.selfId = null;
+  G.spawned = false;
+  G.dead = false;
+  G.deathT = 0;
+  G.killer = '';
+  G.matchEnd = false;
+  G.charging = false;
+  G.charge = 0;
+  G.cooldown = 0;
+  G.flash = 0;
+  G.desat = 0;
+  G.focus = 0;
+  G.shake = 0;
+  G.vy = 0;
+  G.grounded = true;
+  G.stamina = 1;
+  G.staminaLock = 0;
+  G.jumpBuf = 0;
+  G.coyote = 0;
+  G.sprintToggle = false;
+  G.crouchToggle = false;
+  G.sliding = false;
+  G.touchX = 0;
+  G.touchY = 0;
+  G.keys.clear();
+  G.scores.clear();
+  G.roster.clear();
+
+  // Other players and snowballs belong to the match that just ended.
+  for (const [, r] of G.remotes) { scene.remove(r.root); disposeObject(r.root); }
+  G.remotes.clear();
+  for (const [, pr] of G.projectiles) scene.remove(pr.mesh);
+  G.projectiles.clear();
+
+  // Drop every in-match layer before the lobby reappears.
+  viewmodel.setVisible(false);
+  ui.hud.classList.add('hidden');
+  ui.pause.classList.add('hidden');
+  ui.death.classList.add('hidden');
+  ui.matchBanner.classList.add('hidden');
+  ui.scoreboard.classList.add('hidden');
+  ui.loading.classList.add('hidden');
+  ui.chargeRing.classList.remove('active');
+  ui.chargeLabel.classList.remove('show');
+  ui.chargeWrap.classList.remove('full');
+  ui.stick?.classList.remove('active');
+  if (ui.stickKnob) ui.stickKnob.style.transform = '';
+  ui.killfeed.innerHTML = '';
+  ui.toast.innerHTML = '';
+  ui.scoreRows.innerHTML = '';
+  ui.respawnBar.style.width = '0%';
+  ui.onlineCount.textContent = '1';
+  ui.pingVal.textContent = '0';
+  setRoomCode(null);
+  setMenuStatus(message || 'Bereit.', message ? 'err' : '');
+
+  // A clean play tab, then the main screen.
+  setMenuTab('play');
+  closeInfo();
+  setCustomizer(false);
+  ui.optionsPanel?.classList.add('hidden');
+  ui.joinPanel?.classList.add('hidden');
+  ui.menu.classList.remove('hidden');
+  ui.menu.scrollTop = 0;
+  preview.show();
+
+  setLoading(false);
 }
 
 window.addEventListener('beforeunload', () => {
@@ -2352,16 +2424,17 @@ function loop(fixedDt) {
   updateFpsChip();
 
   // frame-time governor: aim for a steady 60 fps (off in debug so captures
-  // keep full quality on software renderers)
+  // keep full quality on software renderers). Only step down -- switching back
+  // up reallocated the post buffers every few seconds on phones, which showed
+  // up as a regular hitch; quality recovers on the next settings change/reload.
   fpsAccum += dt;
   fpsFrames++;
   if (!DEBUG && fpsAccum > 1.5) {
     const fps = fpsFrames / fpsAccum;
     fpsAccum = 0;
     fpsFrames = 0;
-    if (fps < 52 && renderScale > 0.61) applyRenderScale(renderScale - 0.1);
-    else if (fps > 57.5 && renderScale < 1) applyRenderScale(renderScale + 0.05);
-    else if (fps < 45 && renderScale <= 0.61 && !G.lowFx) {
+    if (fps < 50 && renderScale > 0.61) applyRenderScale(renderScale - 0.1);
+    else if (fps < 43 && renderScale <= 0.61 && !G.lowFx) {
       G.lowFx = true;
       post.setBloom(false);
       world.setLowFx(true);
