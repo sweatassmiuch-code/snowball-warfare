@@ -18,9 +18,16 @@ const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
 const coarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
 const hoverPointer = window.matchMedia ? window.matchMedia('(hover: hover)').matches : true;
-const isTouch = params.has('touch') || coarsePointer ||
-  ((navigator.maxTouchPoints || 0) > 0 && !hoverPointer);
-if (isTouch) document.body.classList.add('is-touch');
+const isTypingTarget = (el) => el instanceof Element &&
+  (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+// Touch is a fallback for machines without a mouse, not a default: a stored
+// keyboard choice wins, and the first hardware key press switches a
+// misdetected touchscreen laptop back to desktop input.
+let isTouch = params.has('touch') || (() => {
+  try { if (localStorage.getItem('sbw.input') === 'keyboard') return false; } catch {}
+  return !hoverPointer && (coarsePointer || (navigator.maxTouchPoints || 0) > 0);
+})();
+document.body.classList.toggle('is-touch', isTouch);
 const hasMouse = () => document.pointerLockElement === canvas || (DEBUG && !!window.__sbw?.forceInput);
 
 function syncOrientation() {
@@ -1428,6 +1435,10 @@ function startSlide(speed) {
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const key = e.code;
+  // any real keyboard key means desktop play; typing in a field is not a
+  // hardware-keyboard signal (a phone's soft keyboard fires keydown too)
+  const pressed = key || e.key;
+  if (isTouch && pressed && pressed !== 'Unidentified' && !isTypingTarget(e.target)) setTouchMode(false);
   if (['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(key)) e.preventDefault();
 
   if (key === 'Tab') {
@@ -1574,6 +1585,32 @@ canvas.addEventListener('pointermove', (e) => {
 function endLook(e) { if (e.pointerId === lookId) lookId = null; }
 canvas.addEventListener('pointerup', endLook);
 canvas.addEventListener('pointercancel', endLook);
+
+// Switching input while the match runs: park the virtual stick and the touch
+// look, and hand the controls back to mouse and keyboard (or the other way).
+function setTouchMode(on, remember = true) {
+  if (isTouch === on) return;
+  isTouch = on;
+  document.body.classList.toggle('is-touch', on);
+  if (remember) {
+    try { localStorage.setItem('sbw.input', on ? 'touch' : 'keyboard'); } catch {}
+  }
+  G.touchX = 0;
+  G.touchY = 0;
+  stickId = null;
+  lookId = null;
+  if (ui.stickKnob) ui.stickKnob.style.transform = '';
+  if (on && document.pointerLockElement) {
+    try { document.exitPointerLock(); } catch {}
+  }
+  syncOrientation();
+}
+
+// A real finger on the glass is the only thing that brings the touch layout
+// back after a keyboard press.
+document.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch' && !isTouch) setTouchMode(true);
+}, true);
 
 ui.touchThrow?.addEventListener('pointerdown', (e) => {
   if (!isTouch) return;
