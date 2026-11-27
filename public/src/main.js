@@ -2207,7 +2207,7 @@ function updateHud(dt) {
     ui.chargeArc.style.strokeDashoffset = String(c);
     ui.chargeWrap.classList.toggle('full', G.charge > 0.985);
     const power = G.charge > 0.985 ? 'MAXIMALE WUCHT' : 'WUCHT ' + Math.round(G.charge * 100) + '%';
-    G.chargeLabel.textContent = power;
+    ui.chargeLabel.textContent = power;
   }
   post.composite.uniforms.uFocus.value = G.focus;
 
