@@ -1908,6 +1908,233 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: -0.005em;
 }
 
+/* =========================================================================
+   FROST WALTZ SKIN — moonlit glass, candle-gold hairlines, drifting snow.
+   The lobby is a ballroom at dusk: warm moon behind the rider, frosted
+   panels with thin gold trim, snow drifting across the whole frame.
+   ========================================================================= */
+.menu-c7 {
+  --gold: #ffd8a3;
+  --gold-soft: rgba(255, 216, 163, 0.5);
+  --gold-line: rgba(255, 216, 163, 0.2);
+  --glass: rgba(7, 23, 33, 0.55);
+}
+.menu-bg { filter: saturate(0.92) brightness(0.86); }
+.menu-bg::after {
+  background:
+    radial-gradient(58% 52% at 50% 40%, rgba(255, 226, 186, 0.16), transparent 72%),
+    linear-gradient(90deg, rgba(4, 14, 24, 0.8) 0%, rgba(4, 14, 24, 0.3) 28%, rgba(4, 14, 24, 0) 54%, rgba(4, 14, 24, 0.42) 100%),
+    linear-gradient(180deg, rgba(4, 13, 22, 0.82) 0%, rgba(4, 13, 22, 0.14) 26%, rgba(4, 13, 22, 0.05) 58%, rgba(3, 10, 18, 0.88) 100%);
+}
+
+/* drifting snow: two slow layers of tiny flakes over everything but the
+   nav and panels, so the lobby moves without stealing a single click */
+.c7-flurry {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, #000 18%, #000 86%, rgba(0, 0, 0, 0.1) 100%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, #000 18%, #000 86%, rgba(0, 0, 0, 0.1) 100%);
+}
+.c7-flurry i {
+  position: absolute; left: -12%; right: -12%; top: -70%; height: 240%;
+  background-image:
+    radial-gradient(2.2px 2.2px at 14% 12%, rgba(255, 255, 255, 0.92), transparent 62%),
+    radial-gradient(1.6px 1.6px at 62% 6%, rgba(255, 255, 255, 0.7), transparent 62%),
+    radial-gradient(2.6px 2.6px at 38% 28%, rgba(255, 255, 255, 0.66), transparent 62%),
+    radial-gradient(1.7px 1.7px at 84% 22%, rgba(255, 255, 255, 0.76), transparent 62%),
+    radial-gradient(1.9px 1.9px at 26% 46%, rgba(255, 255, 255, 0.56), transparent 62%),
+    radial-gradient(1.4px 1.4px at 72% 52%, rgba(255, 255, 255, 0.66), transparent 62%),
+    radial-gradient(2.4px 2.4px at 48% 64%, rgba(255, 255, 255, 0.5), transparent 62%),
+    radial-gradient(1.6px 1.6px at 92% 74%, rgba(255, 255, 255, 0.6), transparent 62%);
+  background-size: 360px 320px, 280px 260px, 420px 380px, 330px 300px, 250px 240px, 390px 350px, 300px 290px, 460px 420px;
+  animation: c7Snowfall 46s linear infinite;
+}
+.c7-flurry i:nth-child(2) {
+  opacity: 0.6;
+  background-size: 210px 190px, 260px 240px, 180px 170px, 240px 220px, 200px 190px, 230px 210px, 170px 160px, 250px 230px;
+  animation-duration: 74s;
+  animation-delay: -18s;
+}
+@keyframes c7Snowfall {
+  from { transform: translate3d(0, -14%, 0); }
+  to { transform: translate3d(-3%, 14%, 0); }
+}
+
+/* navigation ------------------------------------------------------------ */
+.c7-nav {
+  background: linear-gradient(180deg, rgba(4, 16, 25, 0.92), rgba(4, 16, 25, 0.4));
+  border-bottom: 1px solid var(--gold-line);
+  box-shadow: 0 20px 48px rgba(2, 8, 14, 0.38);
+}
+.c7-wordmark { letter-spacing: 0.055em; text-shadow: 0 2px 20px rgba(255, 214, 160, 0.24); }
+.c7-wordmark i { filter: drop-shadow(0 0 9px rgba(255, 216, 163, 0.65)); }
+.c7-tab.is-on::after {
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 216, 163, 0) 0%, var(--gold) 16%, #fff 50%, var(--gold) 84%, rgba(255, 216, 163, 0) 100%);
+  box-shadow: 0 0 18px rgba(255, 216, 163, 0.7);
+}
+.c7-tab:hover { color: #fff; text-shadow: 0 0 18px rgba(255, 216, 163, 0.35); }
+.c7-menu-btn { border-color: rgba(255, 216, 163, 0.24); }
+.c7-menu-btn:hover { border-color: var(--gold); background: rgba(255, 216, 163, 0.12); }
+
+/* the stage: a moon disc, one thin halo ring and a single gold caption ---- */
+.c7-stage::before {
+  content: ""; position: absolute; left: 50%; top: 42%;
+  width: min(92%, 640px); height: auto; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side,
+    rgba(255, 240, 214, 0.26) 0%,
+    rgba(255, 214, 160, 0.11) 42%,
+    rgba(158, 206, 244, 0.06) 64%,
+    transparent 78%);
+  filter: blur(1px);
+  pointer-events: none;
+  animation: c7HaloBreath 16s ease-in-out infinite;
+}
+@keyframes c7HaloBreath {
+  0%, 100% { opacity: 0.86; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.035); }
+}
+.c7-stage-halo {
+  position: absolute; left: 50%; top: 34%; z-index: 0;
+  width: min(44%, 290px); aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 226, 186, 0.07);
+  box-shadow: inset 0 0 90px rgba(255, 214, 160, 0.1);
+  pointer-events: none;
+}
+.c7-stage-halo::after {
+  content: ""; position: absolute; inset: -13%;
+  border-radius: 50%;
+  border: 1px solid rgba(198, 230, 252, 0.035);
+}
+.c7-stage-kicker {
+  position: absolute; top: 0; left: 50%; z-index: 2;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 11px;
+  white-space: nowrap; pointer-events: none;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 0.42em; text-transform: uppercase;
+  color: rgba(255, 226, 186, 0.78);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.65);
+}
+.c7-stage-kicker i { display: block; width: 26px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-soft)); }
+.c7-stage-kicker i:last-child { background: linear-gradient(270deg, transparent, var(--gold-soft)); }
+.c7-player-label {
+  display: flex; align-items: center; gap: 12px;
+  letter-spacing: 0.3em;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+}
+.c7-player-label::before,
+.c7-player-label::after {
+  content: ""; width: clamp(18px, 3vw, 40px); height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-soft));
+}
+.c7-player-label::after { background: linear-gradient(270deg, transparent, var(--gold-soft)); }
+
+/* left rail: frosted glass with a hairline of candle gold on top ---------- */
+.c7-card {
+  border-radius: 14px;
+  border: 1px solid rgba(214, 236, 250, 0.16);
+  background: rgba(8, 25, 36, 0.5);
+  backdrop-filter: blur(14px) saturate(1.05);
+  box-shadow: 0 20px 44px rgba(2, 10, 17, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+}
+.c7-card::before {
+  content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 1px; z-index: 3;
+  background: linear-gradient(90deg, transparent, rgba(255, 216, 163, 0.55), transparent);
+}
+.c7-card:hover {
+  filter: none;
+  border-color: rgba(255, 216, 163, 0.42);
+  box-shadow: 0 26px 54px rgba(2, 10, 17, 0.5), 0 0 26px rgba(255, 214, 160, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.c7-card-tag {
+  background: rgba(255, 226, 186, 0.94);
+  color: #241a0b;
+  letter-spacing: 0.07em;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+}
+.c7-card-tag-new { background: var(--orange); color: #22150a; }
+.c7-card-big { color: rgba(255, 244, 228, 0.92); text-shadow: 0 10px 32px rgba(0, 0, 0, 0.35); }
+.c7-card-pass {
+  min-height: clamp(110px, 16.5vh, 158px);
+  background:
+    radial-gradient(120% 130% at 8% 6%, rgba(128, 230, 200, 0.26), transparent 62%),
+    linear-gradient(160deg, rgba(12, 54, 54, 0.84), rgba(6, 25, 35, 0.9));
+}
+.c7-card-bar { background: rgba(255, 255, 255, 0.14); }
+.c7-card-bar i { background: linear-gradient(90deg, rgba(180, 246, 220, 0.95), rgba(255, 226, 186, 0.95)); }
+.c7-card-event {
+  color: #fff;
+  background:
+    radial-gradient(130% 130% at 10% 112%, rgba(255, 196, 120, 0.42), transparent 64%),
+    linear-gradient(160deg, rgba(74, 40, 14, 0.82), rgba(18, 22, 32, 0.92));
+}
+.c7-card-event .c7-card-tag { background: rgba(255, 226, 186, 0.94); color: #2a1a06; }
+.c7-card-event .c7-card-foot { color: rgba(255, 226, 186, 0.95); }
+.c7-card-event { min-height: clamp(108px, 16.5vh, 160px); }
+.c7-card-news { min-height: clamp(148px, 23vh, 226px); }
+.c7-left { justify-content: center; gap: clamp(11px, 1.9vh, 20px); }
+
+
+/* right card: a ballroom ticket ----------------------------------------- */
+.c7-mode {
+  position: relative; overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 216, 163, 0.22);
+  background: linear-gradient(180deg, rgba(8, 28, 40, 0.74), rgba(5, 18, 27, 0.88));
+  box-shadow: 0 34px 80px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 235, 208, 0.14);
+  backdrop-filter: blur(18px) saturate(1.05);
+}
+.c7-mode::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 216, 163, 0.75), transparent);
+}
+.c7-mode-head { color: rgba(255, 226, 186, 0.8); }
+.c7-mode-name { color: #fffaf2; text-shadow: 0 12px 32px rgba(0, 0, 0, 0.42); }
+.c7-name input,
+.c7-join input { border-color: rgba(214, 236, 250, 0.2); background: rgba(2, 12, 19, 0.56); }
+.c7-name input:focus,
+.c7-join input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255, 216, 163, 0.12); }
+.c7-deploy {
+  background: linear-gradient(180deg, #ffedcf 0%, #f7cd93 58%, #eeb877 100%);
+  color: #241a09;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+.c7-deploy:hover {
+  background: linear-gradient(180deg, #fff7e6 0%, #ffdcaa 58%, #f6c88c 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.38), 0 0 30px rgba(255, 214, 160, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.c7-deploy small { color: rgba(36, 26, 9, 0.52); }
+.c7-status { color: #a9c3ce; }
+.c7-join-toggle { color: rgba(255, 226, 186, 0.68); }
+.c7-join button { border-color: rgba(255, 216, 163, 0.45); }
+
+/* footer frame ---------------------------------------------------------- */
+.c7-foot {
+  border-top: 1px solid rgba(255, 216, 163, 0.12);
+  padding-top: clamp(7px, 1.2vh, 12px);
+  color: rgba(214, 236, 250, 0.5);
+}
+.c7-foot-tag { color: rgba(255, 216, 163, 0.62); letter-spacing: 0.28em; }
+
+/* options / info keep the same gold edge -------------------------------- */
+.c7-options { border-color: rgba(255, 216, 163, 0.2); background: rgba(7, 25, 34, 0.97); }
+.c7-info-card { border-color: rgba(255, 216, 163, 0.18); }
+.c7-opt-wide:hover { border-color: var(--gold); background: rgba(255, 216, 163, 0.12); }
+
+@media (max-width: 900px), (max-height: 560px) {
+  .c7-stage-kicker { display: none; }
+  .c7-stage-halo { width: min(66%, 240px); top: 46%; }
+  .c7-player-label::before,
+  .c7-player-label::after { display: none; }
+  .c7-foot-tag { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .c7-flurry i, .c7-stage::before { animation: none; }
+}
+
 /* responsive lobby ------------------------------------------------------ */
 @media (max-width: 1180px) {
   .c7-layout { grid-template-columns: minmax(160px, 230px) minmax(0, 1fr) minmax(240px, 330px); gap: 16px; }
@@ -1957,7 +2184,6 @@ input[type="range"]::-moz-range-thumb {
    mode name and deploy. Nav, tags, meta, HUD and touch controls keep the
    condensed faces so they stay crisp. */
 .menu-c7 .c7-wordmark,
-.menu-c7 .c7-card-big,
 .menu-c7 .c7-card-title,
 .menu-c7 .c7-card-news-copy b,
 .menu-c7 .c7-mode-name,

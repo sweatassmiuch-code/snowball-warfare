@@ -838,8 +838,8 @@ const preview = (() => {
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(31, 1, 0.05, 20);
-    camera.position.set(0, 1.0, 4.3);
-    camera.lookAt(0, 0.94, 0);
+    camera.position.set(0, 1.0, 4.02);
+    camera.lookAt(0, 0.92, 0);
 
     scene.add(new THREE.HemisphereLight(0xd6e8ff, 0x22303b, 1.45));
     const key = new THREE.DirectionalLight(0xfff1dd, 2.9);
@@ -862,6 +862,11 @@ const preview = (() => {
     const fill = new THREE.DirectionalLight(0xffd9c2, 0.7);
     fill.position.set(2.2, 0.6, 1.8);
     scene.add(fill);
+    // candle-warm backlight: a thin gold edge on the beanie and shoulders,
+    // the way the moon in the lobby art sits behind the rider
+    const warmth = new THREE.DirectionalLight(0xffcf9a, 0.9);
+    warmth.position.set(-1.5, 1.7, -2.3);
+    scene.add(warmth);
     // soft frontal fill keeps the sleeve tubes from reading as dark slabs
     const front = new THREE.DirectionalLight(0xeaf4ff, 0.55);
     front.position.set(0.5, 1.3, 3.4);

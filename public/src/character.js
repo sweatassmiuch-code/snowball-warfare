@@ -364,11 +364,11 @@ function tileNoise(x, y, p) {
   return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
 }
 
-// Cartoon eye: the reference's plain black oval. No iris, no sclera and no
-// catchlight -- at this head size the solid shape is what reads as a face,
-// and the tall aspect is what keeps it from looking like two buttons.
+// Cartoon eye: a tall black oval with a warm catchlight and a soft lid
+// shadow. The solid shape still reads as a face at menu distance, but the
+// glint and the lit lower edge stop it staring like a painted button.
 function eyeTexture(idx, open) {
-  const key = 'eye3:' + (open ? 1 : 0);
+  const key = 'eye4:' + (open ? 1 : 0);
   if (texCache.has(key)) return texCache.get(key);
   const W = 256, H = 256;
   const c = document.createElement('canvas');
@@ -376,11 +376,40 @@ function eyeTexture(idx, open) {
   const ctx = c.getContext('2d');
   const cx = W / 2, cy = H / 2;
 
-  ctx.fillStyle = '#0f1116';
+  if (open) {
+    // upper lid shadow on the skin: gives the eye a socket to sit in
+    const lid = ctx.createLinearGradient(0, cy - 118, 0, cy - 30);
+    lid.addColorStop(0, 'rgba(96,52,42,0.20)');
+    lid.addColorStop(1, 'rgba(96,52,42,0)');
+    ctx.fillStyle = lid;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - 74, 74, 44, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#12141b';
   ctx.beginPath();
-  if (open) ctx.ellipse(cx, cy, 62, 104, 0, 0, Math.PI * 2);
-  else ctx.ellipse(cx, cy + 22, 62, 14, 0, 0, Math.PI * 2);
+  if (open) ctx.ellipse(cx, cy, 54, 94, 0, 0, Math.PI * 2);
+  else ctx.ellipse(cx, cy + 26, 54, 13, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  if (open) {
+    const glint = (x, y, r, a) => {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, `rgba(255,250,238,${a})`);
+      g.addColorStop(0.55, `rgba(255,240,214,${a * 0.5})`);
+      g.addColorStop(1, 'rgba(255,240,214,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    // two glints, one in each half: whichever way the decal lands on the
+    // face, the eye keeps a catchlight in its upper half
+    glint(cx - 15, cy - 34, 30, 0.96);
+    glint(cx + 16, cy + 30, 16, 0.72);
+    glint(cx + 9, cy - 46, 10, 0.55);
+  }
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
