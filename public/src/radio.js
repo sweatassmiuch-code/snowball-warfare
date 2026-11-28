@@ -1,18 +1,20 @@
-// The little radio under the HUD: ten calm winter tracks streamed through one
-// <audio> element. Streaming instead of decoding keeps ten files out of memory
-// and makes skip instant; the element's volume rides the game's volume slider.
+// The little radio under the HUD: ten light-hearted tracks streamed through
+// one <audio> element. Streaming instead of decoding keeps ten files out of
+// memory and makes skip instant; the element's volume rides the game's volume
+// slider. The list alternates goofy numbers with mellow ones, so skipping
+// never lands on two clowns in a row.
 // Every track: "Kevin MacLeod (incompetech.com)", CC BY 4.0.
 export const RADIO_TRACKS = [
-  { title: 'Winter Chimes', file: '../assets/music/radio/winter-chimes.mp3' },
-  { title: 'Winter Reflections', file: '../assets/music/radio/winter-reflections.mp3' },
-  { title: 'Snowdrop', file: '../assets/music/radio/snowdrop.mp3' },
-  { title: 'Clear Waters', file: '../assets/music/radio/clear-waters.mp3' },
-  { title: 'Avec Soin', file: '../assets/music/radio/avec-soin.mp3' },
-  { title: 'Friday Morning', file: '../assets/music/radio/friday-morning.mp3' },
-  { title: 'Immersed', file: '../assets/music/radio/immersed.mp3' },
-  { title: 'Dreamy Flashback', file: '../assets/music/radio/dreamy-flashback.mp3' },
-  { title: 'Peaceful Desolation', file: '../assets/music/radio/peaceful-desolation.mp3' },
-  { title: 'Dreamer', file: '../assets/music/radio/dreamer.mp3' }
+  { title: 'Monkeys Spinning Monkeys', file: '../assets/music/radio/monkeys-spinning-monkeys.mp3' },
+  { title: 'Life of Riley', file: '../assets/music/radio/life-of-riley.mp3' },
+  { title: 'Sneaky Snitch', file: '../assets/music/radio/sneaky-snitch.mp3' },
+  { title: 'Cattails', file: '../assets/music/radio/cattails.mp3' },
+  { title: 'Fluffing a Duck', file: '../assets/music/radio/fluffing-a-duck.mp3' },
+  { title: 'Wallpaper', file: '../assets/music/radio/wallpaper.mp3' },
+  { title: 'Happy Happy Game Show', file: '../assets/music/radio/happy-happy-game-show.mp3' },
+  { title: 'Pamgaea', file: '../assets/music/radio/pamgaea.mp3' },
+  { title: 'Funin and Sunin', file: '../assets/music/radio/funin-and-sunin.mp3' },
+  { title: 'Bumbly March', file: '../assets/music/radio/bumbly-march.mp3' }
 ];
 
 const ARTIST = 'Kevin MacLeod';

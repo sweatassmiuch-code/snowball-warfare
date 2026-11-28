@@ -164,8 +164,9 @@ Sie liegen als `public/assets/music/radio/*.mp3` im Projekt und laufen über das
 unten im Bild: `public/src/radio.js` hält die Playlist und den `<audio>`-Player,
 Play/Pause und Skip gehen per Klick oder mit `P` und `N`.
 
-„Winter Chimes“, „Winter Reflections“, „Snowdrop“, „Clear Waters“, „Avec Soin“,
-„Friday Morning“, „Immersed“, „Dreamy Flashback“, „Peaceful Desolation“, „Dreamer“.
+„Monkeys Spinning Monkeys“, „Life of Riley“, „Sneaky Snitch“, „Cattails“,
+„Fluffing a Duck“, „Wallpaper“, „Happy Happy Game Show“, „Pamgaea“,
+„Funin and Sunin“, „Bumbly March“ – verspielt und locker, kein Pathos.
 Der Credit steht zusätzlich im Info-Panel des Spiels.
 
 ---
