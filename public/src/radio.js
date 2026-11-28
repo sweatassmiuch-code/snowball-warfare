@@ -1,23 +1,22 @@
-// The little radio under the HUD: ten light-hearted tracks streamed through
-// one <audio> element. Streaming instead of decoding keeps ten files out of
-// memory and makes skip instant; the element's volume rides the game's volume
-// slider. The list alternates goofy numbers with mellow ones, so skipping
-// never lands on two clowns in a row.
-// Every track: "Kevin MacLeod (incompetech.com)", CC BY 4.0.
+// The little radio under the HUD: ten lo-fi tracks streamed through one
+// <audio> element. Streaming instead of decoding keeps ten files out of memory
+// and makes skip instant; the element's volume rides the game's volume slider.
+// All of it is mellow lo-fi, no jokes in it.
+// Every track: "Loyalty Freak Music", CC0 (public domain).
 export const RADIO_TRACKS = [
-  { title: 'Monkeys Spinning Monkeys', file: '../assets/music/radio/monkeys-spinning-monkeys.mp3' },
-  { title: 'Life of Riley', file: '../assets/music/radio/life-of-riley.mp3' },
-  { title: 'Sneaky Snitch', file: '../assets/music/radio/sneaky-snitch.mp3' },
-  { title: 'Cattails', file: '../assets/music/radio/cattails.mp3' },
-  { title: 'Fluffing a Duck', file: '../assets/music/radio/fluffing-a-duck.mp3' },
-  { title: 'Wallpaper', file: '../assets/music/radio/wallpaper.mp3' },
-  { title: 'Happy Happy Game Show', file: '../assets/music/radio/happy-happy-game-show.mp3' },
-  { title: 'Pamgaea', file: '../assets/music/radio/pamgaea.mp3' },
-  { title: 'Funin and Sunin', file: '../assets/music/radio/funin-and-sunin.mp3' },
-  { title: 'Bumbly March', file: '../assets/music/radio/bumbly-march.mp3' }
+  { title: 'Drowning in Your Smile', file: '../assets/music/radio/drowning-in-your-smile.mp3' },
+  { title: 'Sugar and Coffee', file: '../assets/music/radio/sugar-and-coffee.mp3' },
+  { title: 'Aeroplane', file: '../assets/music/radio/aeroplane.mp3' },
+  { title: "Where I'm High", file: '../assets/music/radio/where-im-high.mp3' },
+  { title: 'Dancing in the Street', file: '../assets/music/radio/dancing-in-the-street.mp3' },
+  { title: 'Soft as a Dry Pillow', file: '../assets/music/radio/soft-as-a-dry-pillow.mp3' },
+  { title: "I'm Glad You Are Here with Me", file: '../assets/music/radio/glad-you-are-here.mp3' },
+  { title: 'Crying Those Tears I Kept So Long', file: '../assets/music/radio/crying-those-tears.mp3' },
+  { title: "I Hope You're Happy", file: '../assets/music/radio/i-hope-youre-happy.mp3' },
+  { title: 'This Pain Is Soft but Here', file: '../assets/music/radio/this-pain-is-soft.mp3' }
 ];
 
-const ARTIST = 'Kevin MacLeod';
+const ARTIST = 'Loyalty Freak Music';
 
 export function createRadio({ volume = 0.28, onTrack, onState } = {}) {
   const el = new Audio();

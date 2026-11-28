@@ -152,21 +152,23 @@ snowdown/
 - **Game Feel:** Zeitlupen-Freeze beim Aufladen, Ziellinie mit Aufschlagring, FOV-Kick,
   Kamera-Recoil, Landestaub, Fußspuren und Atemwolken.
 - **Sound:** Schritte, Wurf, Einschläge und UI-Töne live per WebAudio synthetisiert;
-  dazu ein kleines Winter-Radio unten im Bild (Play/Pause, Skip) mit zehn ruhigen Tracks.
+  dazu ein kleines Winter-Radio unten im Bild (Play/Pause, Skip) mit zehn Lo-Fi-Tracks.
 
 ---
 
 ## Musik
 
-Zehn Tracks von **Kevin MacLeod** ([incompetech.com](https://incompetech.com)),
-lizenziert unter [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+Zehn Tracks von **Loyalty Freak Music** ([Bandcamp](https://loyaltyfreakmusic.bandcamp.com/)),
+veröffentlicht unter [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) – gemeinfrei,
+keine Namensnennung nötig (steht trotzdem im Info-Panel).
 Sie liegen als `public/assets/music/radio/*.mp3` im Projekt und laufen über das Radio
 unten im Bild: `public/src/radio.js` hält die Playlist und den `<audio>`-Player,
 Play/Pause und Skip gehen per Klick oder mit `P` und `N`.
 
-„Monkeys Spinning Monkeys“, „Life of Riley“, „Sneaky Snitch“, „Cattails“,
-„Fluffing a Duck“, „Wallpaper“, „Happy Happy Game Show“, „Pamgaea“,
-„Funin and Sunin“, „Bumbly March“ – verspielt und locker, kein Pathos.
+„Drowning in Your Smile“, „Sugar and Coffee“, „Aeroplane“, „Where I'm High“,
+„Dancing in the Street“, „Soft as a Dry Pillow“, „I'm Glad You Are Here with Me“,
+„Crying Those Tears I Kept So Long“, „I Hope You're Happy“, „This Pain Is Soft but Here“ –
+entspanntes Lo-Fi mit Knacks und verhallten Keys, keine Comedy.
 Der Credit steht zusätzlich im Info-Panel des Spiels.
 
 ---
