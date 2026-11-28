@@ -1087,6 +1087,30 @@ document.querySelectorAll('[data-menu-tab]').forEach((btn) => {
   });
 });
 
+// Every key and every button answers with the same dry tick, so the lobby feels
+// physical even where the action itself is silent (a tab switch, a toggle,
+// Escape). During a match only the keys that act on the UI answer -- movement
+// keys stay quiet, otherwise a strafe would turn into a rattle.
+const CLICK_TARGETS = 'button, .c7-tab, .c7-card, .c7-opt, .c7-join-toggle, [data-menu-tab], [data-slot], [data-color], [data-hat], [data-skin], input[type="range"], select, summary';
+const SILENT_KEYS = new Set(['Shift', 'ShiftLeft', 'ShiftRight', 'Control', 'ControlLeft', 'ControlRight', 'Alt', 'AltLeft', 'AltRight', 'Meta', 'MetaLeft', 'MetaRight', 'CapsLock', 'Fn', 'Dead', 'Unidentified']);
+const UI_KEYS = new Set(['Escape', 'Tab', 'Enter', 'KeyM', 'KeyF']);
+
+document.addEventListener('pointerdown', (e) => {
+  const hit = e.target instanceof Element ? e.target.closest(CLICK_TARGETS) : null;
+  if (!hit) return;
+  audio.init();
+  audio.click();
+}, true);
+
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (SILENT_KEYS.has(e.key) || SILENT_KEYS.has(e.code)) return;
+  const inMenu = !ui.menu || !ui.menu.classList.contains('hidden');
+  if (!inMenu && !UI_KEYS.has(e.code)) return;
+  audio.init();
+  audio.click();
+}, true);
+
 ui.optionsBtn?.addEventListener('click', () => {
   setCustomizer(false);
   ui.optionsPanel.classList.toggle('hidden');

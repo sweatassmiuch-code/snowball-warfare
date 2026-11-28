@@ -18,7 +18,7 @@ export function createAudio() {
   // hand with a long crossfade, because a plain loop would click on the seam.
   // It keeps running from the menu straight through the match.
   const MUSIC_URL = '../assets/music/frost-waltz.mp3';
-  const MUSIC_LEVEL = 0.4;
+  const MUSIC_LEVEL = 0.28;
   const MUSIC_FADE = 2.5;
 
   function makeNoiseBuffer(seconds) {
@@ -246,6 +246,16 @@ export function createAudio() {
     ui() {
       if (!ctx) return;
       noiseBurst({ dur: 0.05, freq: 2600, q: 1.5, gain: 0.12 });
+    },
+
+    // One dry plastic tick for every key and button. The noise gives it the
+    // edge, the falling triangle gives it a body; both stay short and quiet
+    // so fast typing turns into a patter instead of a rattle.
+    click() {
+      if (!ctx) return;
+      const pitch = 2300 + Math.random() * 600;
+      noiseBurst({ dur: 0.035, freq: pitch, q: 1.7, gain: 0.11, pan: (Math.random() - 0.5) * 0.12 });
+      tone({ freq: 720 + Math.random() * 140, to: 480, dur: 0.038, gain: 0.05, type: 'triangle' });
     },
 
     hitSnow() {
