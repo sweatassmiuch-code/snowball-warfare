@@ -1,22 +1,23 @@
-// The little radio under the HUD: ten lo-fi tracks streamed through one
+// The little radio under the HUD: ten Christmas pieces streamed through one
 // <audio> element. Streaming instead of decoding keeps ten files out of memory
 // and makes skip instant; the element's volume rides the game's volume slider.
-// All of it is mellow lo-fi, no jokes in it.
-// Every track: "Loyalty Freak Music", CC0 (public domain).
+// Carols alternate with quieter arrangements, so the room never gets shouty.
+// Kevin MacLeod tracks: CC BY 4.0. Band tracks: public domain (US military
+// bands, released as public-domain recordings).
 export const RADIO_TRACKS = [
-  { title: 'Drowning in Your Smile', file: '../assets/music/radio/drowning-in-your-smile.mp3' },
-  { title: 'Sugar and Coffee', file: '../assets/music/radio/sugar-and-coffee.mp3' },
-  { title: 'Aeroplane', file: '../assets/music/radio/aeroplane.mp3' },
-  { title: "Where I'm High", file: '../assets/music/radio/where-im-high.mp3' },
-  { title: 'Dancing in the Street', file: '../assets/music/radio/dancing-in-the-street.mp3' },
-  { title: 'Soft as a Dry Pillow', file: '../assets/music/radio/soft-as-a-dry-pillow.mp3' },
-  { title: "I'm Glad You Are Here with Me", file: '../assets/music/radio/glad-you-are-here.mp3' },
-  { title: 'Crying Those Tears I Kept So Long', file: '../assets/music/radio/crying-those-tears.mp3' },
-  { title: "I Hope You're Happy", file: '../assets/music/radio/i-hope-youre-happy.mp3' },
-  { title: 'This Pain Is Soft but Here', file: '../assets/music/radio/this-pain-is-soft.mp3' }
+  { title: 'Deck the Halls', artist: 'The United States Air Force Band', file: '../assets/music/radio/deck-the-halls.mp3' },
+  { title: 'Jingle Bells', artist: 'Kevin MacLeod', file: '../assets/music/radio/jingle-bells.mp3' },
+  { title: 'Angels We Have Heard on High', artist: 'Kevin MacLeod', file: '../assets/music/radio/angels-we-have-heard.mp3' },
+  { title: 'Dance of the Sugar Plum Fairy', artist: 'Kevin MacLeod', file: '../assets/music/radio/sugar-plum-fairy.mp3' },
+  { title: 'We Wish You a Merry Christmas', artist: 'The United States Navy Band', file: '../assets/music/radio/we-wish-you-a-merry-christmas.mp3' },
+  { title: 'Silent Night', artist: 'Kevin MacLeod', file: '../assets/music/radio/silent-night.mp3' },
+  { title: 'Go Tell It on the Mountain', artist: 'The United States Navy Band', file: '../assets/music/radio/go-tell-it-on-the-mountain.mp3' },
+  { title: 'It Came Upon a Midnight Clear', artist: 'Kevin MacLeod', file: '../assets/music/radio/it-came-upon-a-midnight-clear.mp3' },
+  { title: 'Joy to the World', artist: 'The United States Navy Band', file: '../assets/music/radio/joy-to-the-world.mp3' },
+  { title: 'Holiday Weasel', artist: 'Kevin MacLeod', file: '../assets/music/radio/holiday-weasel.mp3' }
 ];
 
-const ARTIST = 'Loyalty Freak Music';
+const ARTIST = 'Christmas Radio';
 
 export function createRadio({ volume = 0.28, onTrack, onState } = {}) {
   const el = new Audio();
@@ -28,9 +29,10 @@ export function createRadio({ volume = 0.28, onTrack, onState } = {}) {
   let started = false;
 
   const emitTrack = () => {
+    const track = RADIO_TRACKS[index];
     onTrack?.({
-      ...RADIO_TRACKS[index],
-      artist: ARTIST,
+      ...track,
+      artist: track.artist || ARTIST,
       index,
       count: RADIO_TRACKS.length
     });

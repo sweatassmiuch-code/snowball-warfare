@@ -152,23 +152,24 @@ snowdown/
 - **Game Feel:** Zeitlupen-Freeze beim Aufladen, Ziellinie mit Aufschlagring, FOV-Kick,
   Kamera-Recoil, Landestaub, Fußspuren und Atemwolken.
 - **Sound:** Schritte, Wurf, Einschläge und UI-Töne live per WebAudio synthetisiert;
-  dazu ein kleines Winter-Radio unten im Bild (Play/Pause, Skip) mit zehn Lo-Fi-Tracks.
+  dazu ein kleines Winter-Radio unten im Bild (Play/Pause, Skip) mit zehn Weihnachtsstücken.
 
 ---
 
 ## Musik
 
-Zehn Tracks von **Loyalty Freak Music** ([Bandcamp](https://loyaltyfreakmusic.bandcamp.com/)),
-veröffentlicht unter [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) – gemeinfrei,
-keine Namensnennung nötig (steht trotzdem im Info-Panel).
+Zehn Weihnachtsstücke aus zwei Quellen: Band-Aufnahmen der
+**United States Air Force Band** und **United States Navy Band** (gemeinfrei) sowie
+Stücke von **Kevin MacLeod** ([incompetech.com](https://incompetech.com)) unter
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 Sie liegen als `public/assets/music/radio/*.mp3` im Projekt und laufen über das Radio
 unten im Bild: `public/src/radio.js` hält die Playlist und den `<audio>`-Player,
 Play/Pause und Skip gehen per Klick oder mit `P` und `N`.
 
-„Drowning in Your Smile“, „Sugar and Coffee“, „Aeroplane“, „Where I'm High“,
-„Dancing in the Street“, „Soft as a Dry Pillow“, „I'm Glad You Are Here with Me“,
-„Crying Those Tears I Kept So Long“, „I Hope You're Happy“, „This Pain Is Soft but Here“ –
-entspanntes Lo-Fi mit Knacks und verhallten Keys, keine Comedy.
+„Deck the Halls“, „We Wish You a Merry Christmas“, „Go Tell It on the Mountain“,
+„Joy to the World“ (Bands) sowie „Jingle Bells“, „Angels We Have Heard on High“,
+„Dance of the Sugar Plum Fairy“, „Silent Night“, „It Came Upon a Midnight Clear“,
+„Holiday Weasel“ (Kevin MacLeod) – Karols, mal mit Bläsern, mal mit Glockenspiel.
 Der Credit steht zusätzlich im Info-Panel des Spiels.
 
 ---
