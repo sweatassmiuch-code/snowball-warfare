@@ -6,6 +6,7 @@ import {
 import { createWorld } from './scene.js';
 import { createEffects } from './fx.js';
 import { createAudio } from './audio.js';
+import { createRadio } from './radio.js';
 import { createCharacter, makeNameTag, createViewModel, characterColor, createLockerItem, LOOK_PALETTES } from './character.js';
 import { hostGame, joinGame } from './net.js';
 
@@ -517,6 +518,7 @@ ui.volRange.addEventListener('input', () => {
   settings.vol = Number(ui.volRange.value);
   ui.volVal.textContent = Math.round(settings.vol * 100) + '%';
   audio.setVolume(settings.vol);
+  radio.setVolume(settings.vol * RADIO_LEVEL);
   saveSettings();
 });
 ui.qualitySel.addEventListener('change', () => {
@@ -532,7 +534,56 @@ ui.muteBtn.addEventListener('click', () => {
   audio.init();
   audio.setMuted(!audio.isMuted());
   ui.muteBtn.textContent = audio.isMuted() ? 'SOUND OFF' : 'SOUND ON';
+  radio.setMuted(audio.isMuted());
 });
+// ---------------------------------------------------------------------------
+// Radio: ten calm winter tracks with previous / play-pause / next. It lives
+// outside the menu, so the same bar is there in the lobby and in a match.
+// ---------------------------------------------------------------------------
+const RADIO_LEVEL = 0.35; // music under the effects, like the old bed
+const radioUi = {
+  bar: $('radio'), play: $('radioPlay'), prev: $('radioPrev'), next: $('radioNext'),
+  title: $('radioTitle'), artist: $('radioArtist'), count: $('radioCount')
+};
+const radio = createRadio({
+  volume: settings.vol * RADIO_LEVEL,
+  onTrack: (track) => {
+    if (radioUi.title) radioUi.title.textContent = track.title;
+    if (radioUi.artist) radioUi.artist.textContent = track.artist;
+    if (radioUi.count) radioUi.count.textContent = (track.index + 1) + '/' + track.count;
+    radioUi.bar?.setAttribute('title', track.title + ' — ' + track.artist + ', CC BY 4.0');
+  },
+  onState: (state) => {
+    if (!radioUi.play) return;
+    radioUi.play.textContent = state.playing ? '\u275A\u275A' : '\u25B6';
+    radioUi.play.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+    radioUi.bar?.classList.toggle('is-playing', state.playing);
+  }
+});
+radioUi.play?.addEventListener('click', () => radio.toggle());
+radioUi.next?.addEventListener('click', () => radio.next());
+radioUi.prev?.addEventListener('click', () => radio.prev());
+
+// The first real gesture starts the music, the same moment the sound engine
+// wakes up. A press on the radio itself is left to its own button.
+function wakeRadio(e) {
+  if (e.target instanceof Element && e.target.closest('#radio')) return;
+  if (e.type === 'keydown' && (e.code === 'KeyP' || e.code === 'KeyN')) return;
+  window.removeEventListener('pointerdown', wakeRadio);
+  window.removeEventListener('keydown', wakeRadio);
+  if (!radio.playing) radio.play();
+}
+window.addEventListener('pointerdown', wakeRadio);
+window.addEventListener('keydown', wakeRadio);
+
+// Pointer lock keeps the mouse for the game, so during a match the radio
+// answers these two keys as well.
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
+  if (e.code === 'KeyP') radio.toggle();
+  else if (e.code === 'KeyN') radio.next();
+}, true);
+
 ui.roomChip.addEventListener('click', copyCode);
 ui.copyCode.addEventListener('click', copyCode);
 ui.menuBtn.addEventListener('click', () => {
@@ -1763,6 +1814,7 @@ window.addEventListener('keydown', (e) => {
     audio.init();
     audio.setMuted(!audio.isMuted());
     ui.muteBtn.textContent = audio.isMuted() ? 'SOUND OFF' : 'SOUND ON';
+    radio.setMuted(audio.isMuted());
     return;
   }
   if (key === 'KeyF') {

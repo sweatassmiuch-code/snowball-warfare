@@ -22,6 +22,19 @@
 <body>
 <canvas id="game"></canvas>
 
+<!-- ===================== RADIO ===================== -->
+<div id="radio" aria-label="Radio">
+  <button type="button" class="radio-btn" id="radioPrev" aria-label="Previous track" title="Previous track">&#9198;</button>
+  <button type="button" class="radio-btn radio-play" id="radioPlay" aria-label="Play" title="Play / pause (P)">&#9654;</button>
+  <button type="button" class="radio-btn" id="radioNext" aria-label="Next track" title="Next track (N)">&#9197;</button>
+  <div class="radio-meta">
+    <span class="radio-tag">&#10052; WINTER RADIO</span>
+    <span class="radio-title" id="radioTitle">&mdash;</span>
+    <span class="radio-artist" id="radioArtist">Kevin MacLeod</span>
+  </div>
+  <span class="radio-count" id="radioCount">1/10</span>
+</div>
+
 <!-- ===================== IN-GAME HUD ===================== -->
 <div id="hud" class="hidden">
   <div id="topbar">
@@ -170,7 +183,7 @@
 
   <footer class="c7-foot">
     <span>&copy; 2026 SNOWDOWN</span>
-    <span class="c7-foot-tag">&#10052; FROST WALTZ &middot; SEASON 01</span>
+    <span class="c7-foot-tag">&#10052; WINTER RADIO &middot; SEASON 01</span>
     <span class="c7-foot-hint"><b>ENTER</b> START &middot; <b>ESC</b> PAUSE</span>
   </footer>
 
@@ -240,7 +253,7 @@
         <span><kbd>WASD</kbd> MOVE</span><span><kbd>SHIFT</kbd> SPRINT</span><span><kbd>CTRL</kbd> CROUCH</span><span><kbd>SPACE</kbd> JUMP</span><span><kbd>LMB</kbd> THROW</span><span><kbd>TAB</kbd> SCOREBOARD</span>
       </div>
       <p class="c7-info-note">On mobile: landscape, joystick on the left, look on the right, throw button at the bottom right.</p>
-      <p class="c7-info-note">Music: &ldquo;Frost Waltz&rdquo; by Kevin MacLeod (incompetech.com), CC BY 4.0.</p>
+      <p class="c7-info-note">Radio: &ldquo;Winter Chimes&rdquo;, &ldquo;Winter Reflections&rdquo;, &ldquo;Snowdrop&rdquo;, &ldquo;Clear Waters&rdquo;, &ldquo;Avec Soin&rdquo;, &ldquo;Friday Morning&rdquo;, &ldquo;Immersed&rdquo;, &ldquo;Dreamy Flashback&rdquo;, &ldquo;Peaceful Desolation&rdquo; and &ldquo;Dreamer&rdquo; by Kevin MacLeod (incompetech.com), CC BY 4.0. Skip with N, play/pause with P.</p>
     </div>
   </div>
 

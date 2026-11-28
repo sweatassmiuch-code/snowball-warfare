@@ -1,5 +1,5 @@
-// Sound effects are generated with the Web Audio API; the only audio file is
-// the lobby track in assets/music.
+// Sound effects are generated with the Web Audio API. The music is a plain
+// <audio> playlist in radio.js, so nothing in here touches the tracks.
 export function createAudio() {
   let ctx = null;
   let master = null;
@@ -7,19 +7,6 @@ export function createAudio() {
   let muted = false;
   let volume = 0.8;
   let noiseBuffer = null;
-  let musicGain = null;
-  let musicBuffer = null;
-  let musicStarted = false;
-  let musicNextAt = 0;
-  let musicWatch = null;
-
-  // The lobby track: "Frost Waltz" by Kevin MacLeod (incompetech.com), used
-  // under CC BY 4.0. It is decoded once after the first gesture and looped by
-  // hand with a long crossfade, because a plain loop would click on the seam.
-  // It keeps running from the menu straight through the match.
-  const MUSIC_URL = '../assets/music/frost-waltz.mp3';
-  const MUSIC_LEVEL = 0.28;
-  const MUSIC_FADE = 2.5;
 
   function makeNoiseBuffer(seconds) {
     const len = Math.floor(ctx.sampleRate * seconds);
@@ -56,7 +43,6 @@ export function createAudio() {
     sfx.connect(master);
 
     noiseBuffer = makeNoiseBuffer(2);
-    startMusic();
   }
 
   function setVolume(v) {
@@ -121,56 +107,6 @@ export function createAudio() {
     const rightX = Math.cos(yaw), rightZ = -Math.sin(yaw);
     const pan = dist > 0.5 ? Math.max(-1, Math.min(1, (dx * rightX + dz * rightZ) / dist)) * 0.8 : 0;
     return { vol, pan };
-  }
-
-  // ---------------------------------------------------------------------------
-  // Music
-  // ---------------------------------------------------------------------------
-  async function startMusic() {
-    if (musicStarted || !ctx) return;
-    musicStarted = true;
-
-    musicGain = ctx.createGain();
-    musicGain.gain.value = MUSIC_LEVEL;
-    musicGain.connect(master);
-
-    try {
-      const res = await fetch(new URL(MUSIC_URL, import.meta.url));
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      musicBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
-    } catch (err) {
-      console.warn('Lobby music unavailable:', err.message);
-      return;
-    }
-
-    musicNextAt = ctx.currentTime + 0.1;
-    scheduleMusic();
-    musicWatch = setInterval(scheduleMusic, 500);
-  }
-
-  // Keeps the next loop queued ahead of time, so the crossfade always has a
-  // partner voice and a throttled timer cannot open a gap.
-  function scheduleMusic() {
-    if (!musicBuffer || !ctx || ctx.state !== 'running') return;
-    while (musicNextAt < ctx.currentTime + MUSIC_FADE * 2) {
-      playMusicLoop(musicNextAt);
-      musicNextAt += musicBuffer.duration - MUSIC_FADE;
-    }
-  }
-
-  function playMusicLoop(when) {
-    const end = when + musicBuffer.duration;
-    const src = ctx.createBufferSource();
-    src.buffer = musicBuffer;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, when);
-    g.gain.linearRampToValueAtTime(1, when + MUSIC_FADE);
-    g.gain.setValueAtTime(1, end - MUSIC_FADE);
-    g.gain.linearRampToValueAtTime(0.0001, end);
-    src.connect(g);
-    g.connect(musicGain);
-    src.start(when);
-    src.stop(end + 0.05);
   }
 
   const audio = {

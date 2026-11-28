@@ -2387,3 +2387,60 @@ body.touch-device.portrait #rotate { display: flex; }
   #touchThrow b { font-size: 16px; }
 }
 
+
+/* =========================================================================
+   WINTER RADIO — a slim glass bar at the bottom of the lobby and the match:
+   previous, play/pause, next, and what is playing right now.
+   ========================================================================= */
+#radio {
+  position: fixed; left: 50%; bottom: 52px;
+  transform: translateX(-50%);
+  z-index: 46; /* above the menu and the pause card, below the locker */
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px 7px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 216, 163, 0.18);
+  background: linear-gradient(180deg, rgba(6, 28, 38, 0.78), rgba(4, 18, 26, 0.88));
+  box-shadow: 0 18px 40px rgba(2, 10, 17, 0.45), inset 0 1px 0 rgba(255, 235, 208, 0.12);
+  backdrop-filter: blur(14px) saturate(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
+  color: #eaf3fa;
+  user-select: none;
+}
+#radio::before {
+  content: ""; position: absolute; left: 20px; right: 20px; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 216, 163, 0.6), transparent);
+  pointer-events: none;
+}
+.radio-btn {
+  display: grid; place-items: center;
+  width: 26px; height: 26px; padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 236, 250, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(234, 243, 250, 0.85);
+  font-size: 10px; line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.radio-btn:hover { border-color: rgba(255, 216, 163, 0.6); background: rgba(255, 216, 163, 0.14); color: #fff; }
+.radio-btn:focus-visible { outline: 2px solid rgba(255, 216, 163, 0.75); outline-offset: 2px; }
+.radio-play {
+  width: 30px; height: 30px; font-size: 11px;
+  color: #241a0b;
+  border-color: rgba(255, 226, 186, 0.55);
+  background: linear-gradient(180deg, #ffe9c8, #f0c58c);
+}
+.radio-play:hover { background: linear-gradient(180deg, #fff4e0, #f7d3a0); color: #241a0b; }
+#radio.is-playing .radio-play { box-shadow: 0 0 0 1px rgba(255, 226, 186, 0.25), 0 0 18px rgba(255, 214, 160, 0.35); }
+.radio-meta { display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 300px; }
+.radio-tag { font-size: 7.5px; font-weight: 800; letter-spacing: 0.24em; color: rgba(255, 216, 163, 0.75); white-space: nowrap; }
+.radio-title { font-size: 11px; font-weight: 650; letter-spacing: 0.02em; color: #f4f8fb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-artist { font-size: 9px; color: rgba(199, 219, 231, 0.62); white-space: nowrap; }
+.radio-count { font-size: 8px; font-weight: 700; letter-spacing: 0.12em; color: rgba(199, 219, 231, 0.5); }
+
+@media (max-width: 900px), (max-height: 560px) {
+  #radio { bottom: 10px; gap: 7px; padding: 5px 9px 5px 6px; }
+  .radio-artist, .radio-count, .radio-tag { display: none; }
+  .radio-meta { max-width: 42vw; }
+}

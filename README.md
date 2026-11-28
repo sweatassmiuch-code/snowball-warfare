@@ -152,16 +152,21 @@ snowdown/
 - **Game Feel:** Zeitlupen-Freeze beim Aufladen, Ziellinie mit Aufschlagring, FOV-Kick,
   Kamera-Recoil, Landestaub, Fußspuren und Atemwolken.
 - **Sound:** Schritte, Wurf, Einschläge und UI-Töne live per WebAudio synthetisiert;
-  dazu ein echter Musik-Track im Loop (mit Crossfade, damit die Naht nicht knackt).
+  dazu ein kleines Winter-Radio unten im Bild (Play/Pause, Skip) mit zehn ruhigen Tracks.
 
 ---
 
 ## Musik
 
-„Frost Waltz“ von **Kevin MacLeod** ([incompetech.com](https://incompetech.com)),
+Zehn Tracks von **Kevin MacLeod** ([incompetech.com](https://incompetech.com)),
 lizenziert unter [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
-Der Track liegt als `public/assets/music/frost-waltz.mp3` im Projekt und läuft im
-Loop von der Lobby bis ins Match; der Credit steht zusätzlich im Info-Panel des Spiels.
+Sie liegen als `public/assets/music/radio/*.mp3` im Projekt und laufen über das Radio
+unten im Bild: `public/src/radio.js` hält die Playlist und den `<audio>`-Player,
+Play/Pause und Skip gehen per Klick oder mit `P` und `N`.
+
+„Winter Chimes“, „Winter Reflections“, „Snowdrop“, „Clear Waters“, „Avec Soin“,
+„Friday Morning“, „Immersed“, „Dreamy Flashback“, „Peaceful Desolation“, „Dreamer“.
+Der Credit steht zusätzlich im Info-Panel des Spiels.
 
 ---
 
